@@ -1,0 +1,50 @@
+
+@model IEnumerable<Bitcraft.ResourceFinder.Web.Models.Resource>
+@{
+    ViewData["Title"] = "Admin — Review";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var status = (string)ViewBag.Status;
+    var page = (int)ViewBag.Page;
+    var pageSize = (int)ViewBag.PageSize;
+    var total = (int)ViewBag.Total;
+    var pages = (total + pageSize - 1) / pageSize;
+}
+<h3>Admin — @status</h3>
+<table class="table table-striped">
+  <thead>
+    <tr><th>Name</th><th>Tier</th><th>Type</th><th>Biome</th><th>Status</th><th></th></tr>
+  </thead>
+  <tbody>
+  @foreach (var r in Model) {
+    <tr>
+      <td>@r.Name</td>
+      <td>@r.Tier</td>
+      <td>@r.Type?.Name</td>
+      <td>@r.Biome?.Name</td>
+      <td>@r.Status</td>
+      <td class="text-end">
+        <form method="post" action="/admin/resources/@r.Id/status" class="d-inline">
+          <input type="hidden" name="status" value="@(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "confirmed" : "unconfirmed")" />
+          <button class="btn btn-sm btn-success">@(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "Confirm" : "Unconfirm")</button>
+        </form>
+        <a class="btn btn-sm btn-primary" href="/admin/resources/@r.Id/edit">Edit</a>
+        <form method="post" action="/admin/resources/@r.Id/delete" class="d-inline" onsubmit="return confirm('Delete this resource?');">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+  }
+  </tbody>
+</table>
+
+@if (pages > 1) {
+  <nav class="mt-3">
+    <ul class="pagination">
+      @for (int p = 1; p <= pages; p++) {
+        <li class="page-item @(p==page? "active":"")">
+          <a class="page-link" href="@Url.Action("Index", new { status, page = p })">@p</a>
+        </li>
+      }
+    </ul>
+  </nav>
+}

@@ -1,0 +1,39 @@
+
+@model Bitcraft.ResourceFinder.Web.Models.Resource
+@{
+    ViewData["Title"] = "Edit Resource";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var types = ViewBag.Types as List<Bitcraft.ResourceFinder.Web.Models.TypeItem>;
+    var biomes = ViewBag.Biomes as List<Bitcraft.ResourceFinder.Web.Models.Biome>;
+}
+<h3>Edit Resource</h3>
+<form method="post">
+<div class="row g-3">
+  <div class="col-md-2">
+    <label class="form-label">Tier</label>
+    <select class="form-select" name="tier" required>
+      @for (int i = 1; i <= 10; i++) { <option value="@i" selected="@(Model.Tier==i)">@i</option> }
+    </select>
+  </div>
+  <div class="col-md-5">
+    <label class="form-label">Type</label>
+    <select class="form-select" name="typeId" required>
+      @foreach (var t in types) { <option value="@t.Id" selected="@(Model.TypeId==t.Id)">@t.Name</option> }
+    </select>
+  </div>
+  <div class="col-md-5">
+    <label class="form-label">Biome</label>
+    <select class="form-select" name="biomeId" required>
+      @foreach (var b in biomes) { <option value="@b.Id" selected="@(Model.BiomeId==b.Id)">@b.Name</option> }
+    </select>
+  </div>
+  <div class="col-md-12">
+    <label class="form-label">Name</label>
+    <input class="form-control" name="name" value="@Model.Name" required maxlength="80" />
+  </div>
+  <div class="col-md-12">
+    <button class="btn btn-primary">Save</button>
+    <a class="btn btn-secondary" href="/admin">Cancel</a>
+  </div>
+</div>
+</form>

@@ -1,0 +1,18 @@
+
+# Visual Studio / .NET
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+**/wwwroot/images/**
+appsettings.*.local.json
+*.sqlite
+*.db
+*.DS_Store
+node_modules/
+dist/
+
+# Rider
+.idea/

@@ -1,0 +1,48 @@
+
+@{
+    ViewData["Title"] = "Add Resource";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var types = ViewBag.Types as List<Bitcraft.ResourceFinder.Web.Models.TypeItem>;
+    var biomes = ViewBag.Biomes as List<Bitcraft.ResourceFinder.Web.Models.Biome>;
+}
+<div class="card p-4">
+  <form method="post" action="/resources" enctype="multipart/form-data">
+    <div class="row g-3">
+      <div class="col-md-2">
+        <label class="form-label">Tier</label>
+        <select class="form-select" name="tier" required>
+          @for (int i = 1; i <= 10; i++) { <option value="@i">@i</option> }
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Type</label>
+        <select class="form-select" name="typeId" required>
+          @foreach (var t in types) { <option value="@t.Id">@t.Name</option> }
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Biome</label>
+        <select class="form-select" name="biomeId" required>
+          @foreach (var b in biomes) { <option value="@b.Id">@b.Name</option> }
+        </select>
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Name</label>
+        <input class="form-control" name="name" placeholder="e.g., Iron Ore" required maxlength="80" />
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Image (≤ 300 KB; jpg/png/webp)</label>
+        <input class="form-control" type="file" name="image" accept="image/*" />
+      </div>
+      <div class="col-md-12">
+        <button class="btn btn-primary">Submit</button>
+        <a class="btn btn-secondary" href="/resources">Cancel</a>
+      </div>
+    </div>
+  </form>
+</div>
+@section Scripts{
+<script>
+  // Simple duplicate pre-check on blur (AJAX could be added later)
+</script>
+}
