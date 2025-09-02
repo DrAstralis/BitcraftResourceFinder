@@ -30,14 +30,22 @@ builder.Services.AddSingleton<DuplicateService>();
 
 var app = builder.Build();
 
-// Apply migrations (dev-only convenience)
-if (app.Environment.IsDevelopment())
+// Optional migrate + seed (controlled by config; no dev-env tie)
+var cfg = app.Configuration;
+
+if (cfg.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-    await SeedData.EnsureSeedAsync(scope.ServiceProvider, app.Configuration);
+    await db.Database.MigrateAsync();
 }
+
+// Seeding is allowed without schema changes; it will no-op if tables are missing
+if (cfg.GetValue<bool>("Database:SeedOnStartup", true))
+{
+    await SeedData.EnsureSeedAsync(app.Services, cfg);
+}
+
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

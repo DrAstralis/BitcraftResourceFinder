@@ -1,4 +1,5 @@
-
+using Npgsql;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -21,47 +22,49 @@ public static class SeedData
     {
         using var scope = sp.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Data.AppDbContext>();
-        await db.Database.EnsureCreatedAsync();
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
 
-        // Seed Types
-        foreach (var name in TYPES)
+        try
         {
-            if (!await db.Types.AnyAsync(t => t.Name == name))
+            // NO EnsureCreated/Migrate here — schema changes are manual only.
+
+            // Seed Types
+            foreach (var name in TYPES)
+                if (!await db.Types.AnyAsync(t => t.Name == name))
+                    db.Types.Add(new TypeItem { Name = name, Slug = Slugify(name) });
+
+            // Seed Biomes
+            foreach (var name in BIOMES)
+                if (!await db.Biomes.AnyAsync(b => b.Name == name))
+                    db.Biomes.Add(new Biome { Name = name, Slug = Slugify(name) });
+
+            await db.SaveChangesAsync();
+
+            // Roles
+            var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+            if (!await roleMgr.RoleExistsAsync("Admin"))
+                await roleMgr.CreateAsync(new IdentityRole("Admin"));
+
+            // Admin user
+            var adminEmail = cfg["Seed:AdminEmail"] ?? "admin@example.com";
+            var adminPassword = cfg["Seed:AdminPassword"] ?? "ChangeMe!123";
+
+            var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+            var admin = await userMgr.FindByEmailAsync(adminEmail);
+            if (admin == null)
             {
-                db.Types.Add(new TypeItem { Name = name, Slug = Slugify(name) });
+                admin = new IdentityUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
+                var res = await userMgr.CreateAsync(admin, adminPassword);
+                if (res.Succeeded) await userMgr.AddToRoleAsync(admin, "Admin");
             }
         }
-        // Seed Biomes
-        foreach (var name in BIOMES)
+        catch (PostgresException ex) when (ex.SqlState == "42P01") // table missing
         {
-            if (!await db.Biomes.AnyAsync(t => t.Name == name))
-            {
-                db.Biomes.Add(new Biome { Name = name, Slug = Slugify(name) });
-            }
-        }
-        await db.SaveChangesAsync();
-
-        // Roles
-        var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-        if (!await roleMgr.RoleExistsAsync("Admin"))
-            await roleMgr.CreateAsync(new IdentityRole("Admin"));
-
-        // Admin user
-        var adminEmail = cfg["Seed:AdminEmail"] ?? "admin@example.com";
-        var adminPassword = cfg["Seed:AdminPassword"] ?? "ChangeMe!123";
-
-        var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
-        var admin = await userMgr.FindByEmailAsync(adminEmail);
-        if (admin == null)
-        {
-            admin = new IdentityUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
-            var res = await userMgr.CreateAsync(admin, adminPassword);
-            if (res.Succeeded)
-            {
-                await userMgr.AddToRoleAsync(admin, "Admin");
-            }
+            // Schema isn't there yet — skip seeding without blowing up
+            logger.LogWarning("Seeding skipped: required tables are missing ({Message}).", ex.Message);
         }
     }
+
 
     public static string Slugify(string s)
     {
