@@ -79,11 +79,45 @@ public class ResourcesController : Controller
 
         // Strong duplicate guard
         var candidate = await _db.Resources.FirstOrDefaultAsync(r => r.Tier == tier && r.TypeId == typeId && r.BiomeId == biomeId && r.CanonicalName == canonical);
-        if (candidate != null) return Conflict("Duplicate resource exists.");
+        if (candidate != null)
+        {
+            ModelState.AddModelError(string.Empty,
+                "That resource already exists for the selected Tier, Type, and Biome.");
+
+            // repopulate dropdowns
+            ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
+            ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
+
+            // preserve user input
+            ViewBag.Tier = tier;
+            ViewBag.TypeId = typeId;
+            ViewBag.BiomeId = biomeId;
+            ViewBag.Name = name;
+
+            return View("New");
+        }
 
         // Save first to get Id
-        _db.Resources.Add(incoming);
-        await _db.SaveChangesAsync();
+        try
+        {
+            _db.Resources.Add(incoming);
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            ModelState.AddModelError(string.Empty,
+                "That resource already exists for the selected Tier, Type, and Biome.");
+
+            ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
+            ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
+
+            ViewBag.Tier = tier;
+            ViewBag.TypeId = typeId;
+            ViewBag.BiomeId = biomeId;
+            ViewBag.Name = name;
+
+            return View("New");
+        }
 
         if (image != null)
         {
