@@ -1,4 +1,4 @@
-
+﻿
 @model Bitcraft.ResourceFinder.Web.Models.Resource
 @{
     ViewData["Title"] = "Edit Resource";
@@ -7,33 +7,70 @@
     var biomes = ViewBag.Biomes as List<Bitcraft.ResourceFinder.Web.Models.Biome>;
 }
 <h3>Edit Resource</h3>
-<form method="post">
-<div class="row g-3">
-  <div class="col-md-2">
-    <label class="form-label">Tier</label>
-    <select class="form-select" name="tier" required>
-      @for (int i = 1; i <= 10; i++) { <option value="@i" selected="@(Model.Tier==i)">@i</option> }
-    </select>
-  </div>
-  <div class="col-md-5">
-    <label class="form-label">Type</label>
-    <select class="form-select" name="typeId" required>
-      @foreach (var t in types) { <option value="@t.Id" selected="@(Model.TypeId==t.Id)">@t.Name</option> }
-    </select>
-  </div>
-  <div class="col-md-5">
-    <label class="form-label">Biome</label>
-    <select class="form-select" name="biomeId" required>
-      @foreach (var b in biomes) { <option value="@b.Id" selected="@(Model.BiomeId==b.Id)">@b.Name</option> }
-    </select>
-  </div>
-  <div class="col-md-12">
-    <label class="form-label">Name</label>
-    <input class="form-control" name="name" value="@Model.Name" required maxlength="80" />
-  </div>
-  <div class="col-md-12">
-    <button class="btn btn-primary">Save</button>
-    <a class="btn btn-secondary" href="/admin">Cancel</a>
-  </div>
-</div>
+<form method="post" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
+
+    <div class="row g-3">
+        <div class="col-md-2">
+            <label class="form-label">Tier</label>
+            <select class="form-select" name="tier" required>
+                @for (int i = 1; i <= 10; i++)
+                {
+                    <option value="@i" selected="@(Model.Tier == i)">@i</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-5">
+            <label class="form-label">Type</label>
+            <select class="form-select" name="typeId" required>
+                @foreach (var t in (List<Bitcraft.ResourceFinder.Web.Models.TypeItem>)ViewBag.Types)
+                {
+                    <option value="@t.Id" selected="@(Model.TypeId == t.Id)">@t.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-5">
+            <label class="form-label">Biome</label>
+            <select class="form-select" name="biomeId" required>
+                @foreach (var b in (List<Bitcraft.ResourceFinder.Web.Models.Biome>)ViewBag.Biomes)
+                {
+                    <option value="@b.Id" selected="@(Model.BiomeId == b.Id)">@b.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-12">
+            <label class="form-label">Name</label>
+            <input class="form-control" name="name" value="@Model.Name" required maxlength="80" />
+        </div>
+
+        <!-- Image section -->
+        <div class="col-md-12">
+            <label class="form-label d-block">Image</label>
+
+            @if (!string.IsNullOrWhiteSpace(Model.Img256Url) || !string.IsNullOrWhiteSpace(Model.Img512Url))
+            {
+                <div class="mb-2">
+                    <img src="@(Model.Img256Url ?? Model.Img512Url)" alt="Current image" style="max-width: 256px; height: auto; border-radius: 8px;" />
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="removeImage" name="removeImage" value="true" />
+                    <label class="form-check-label" for="removeImage">Remove existing image</label>
+                </div>
+            }
+
+            <div>
+                <input class="form-control" type="file" name="file" accept=".jpg,.jpeg,.png,.webp" />
+                <small class="text-muted">Optional. Upload a new image (≤300 KB). If “Remove image” is checked and you upload a new file, the new file wins.</small>
+            </div>
+        </div>
+
+        <div class="col-md-12">
+            <button class="btn btn-primary">Save</button>
+            <a class="btn btn-secondary" href="/admin">Cancel</a>
+        </div>
+    </div>
 </form>
+
