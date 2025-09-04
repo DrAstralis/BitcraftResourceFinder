@@ -58,7 +58,7 @@
 @foreach (var r in Model) {
   <div class="col">
     <div class="card h-100">
-      <img src="@(r.Img256Url ?? "/images/placeholder-256.webp")" class="card-img-top" alt="@r.Name" />
+                <img src="@Url.Content(r.Img256Url ?? "~/images/placeholder-256.webp")" class="card-img-top" alt="@r.Name" />
       <div class="card-body">
         <h5 class="card-title">@r.Name</h5>
         <p class="card-text mb-1"><strong>Tier:</strong> @r.Tier</p>

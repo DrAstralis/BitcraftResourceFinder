@@ -24,37 +24,55 @@ public class ImageService
         var allowed = new[] { "image/jpeg", "image/png", "image/webp" };
         if (!allowed.Contains(file.ContentType.ToLower())) throw new InvalidOperationException("Unsupported image type.");
 
-        using var img = await Image.LoadAsync(file.OpenReadStream());
-        // deny animated by enforcing a single frame in ImageSharp load
+        using var img = await Image.LoadAsync(file.OpenReadStream()); // single-frame load
 
-        // Output folder
-        var rootRel = _cfg["Image:RootPath"] ?? "wwwroot/images";
-        var root = Path.Combine(AppContext.BaseDirectory, rootRel);
-        Directory.CreateDirectory(root);
+        // Resolve web root in any host (debug, IIS, Kestrel, container, etc.)
+        var webRoot = _env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+
+        // Read configured folder but normalize it to live UNDER webRoot
+        // Accepts values like "images", "~/images", "/images", or "wwwroot/images"
+        var configured = _cfg["Image:RootPath"];
+        string imagesFolder;
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            imagesFolder = Path.Combine(webRoot, "images");
+        }
+        else if (Path.IsPathRooted(configured))
+        {
+            // If someone set an absolute path, use it as-is (advanced scenarios)
+            imagesFolder = configured;
+        }
+        else
+        {
+            var trimmed = configured.TrimStart('~', '/', '\\');
+            if (trimmed.StartsWith("wwwroot", StringComparison.OrdinalIgnoreCase))
+                trimmed = trimmed.Substring("wwwroot".Length).TrimStart('/', '\\');
+
+            imagesFolder = Path.Combine(webRoot, trimmed);
+        }
+
+        Directory.CreateDirectory(imagesFolder);
 
         var baseName = resourceId.ToString("N");
-        var dest256 = Path.Combine(root, baseName + "-256.webp");
-        var dest512 = Path.Combine(root, baseName + "-512.webp");
+        var dest256 = Path.Combine(imagesFolder, baseName + "-256.webp");
+        var dest512 = Path.Combine(imagesFolder, baseName + "-512.webp");
 
         // Resize and save as WebP
         using (var clone = img.Clone(i => i.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(256, 256) })))
-        {
             await clone.SaveAsWebpAsync(dest256, new WebpEncoder { Quality = 80 });
-        }
-        using (var clone = img.Clone(i => i.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(512, 512) })))
-        {
-            await clone.SaveAsWebpAsync(dest512, new WebpEncoder { Quality = 80 });
-        }
 
-        var urlBase = "/images/" + baseName;
+        using (var clone = img.Clone(i => i.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(512, 512) })))
+            await clone.SaveAsWebpAsync(dest512, new WebpEncoder { Quality = 80 });
+
+        // Return app-relative URLs so PathBase is honored (views will call Url.Content)
+        var urlBase = "~/images/" + baseName;
         var img256Url = urlBase + "-256.webp";
         var img512Url = urlBase + "-512.webp";
 
-        // Simple perceptual hash placeholder (average hash)
         string pHash = await ComputeAverageHashAsync(dest512);
-
         return (img256Url, img512Url, pHash);
     }
+
 
     private async Task<string> ComputeAverageHashAsync(string path)
     {

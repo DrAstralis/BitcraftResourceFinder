@@ -33,6 +33,12 @@ var app = builder.Build();
 // Optional migrate + seed (controlled by config; no dev-env tie)
 var cfg = app.Configuration;
 
+var pathBase = cfg["PathBase"] ?? Environment.GetEnvironmentVariable("ASPNETCORE_PATHBASE");
+if (!string.IsNullOrEmpty(pathBase))
+{
+    app.UsePathBase(pathBase);
+}
+
 if (cfg.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
     using var scope = app.Services.CreateScope();
@@ -46,6 +52,11 @@ if (cfg.GetValue<bool>("Database:SeedOnStartup", true))
     await SeedData.EnsureSeedAsync(app.Services, cfg);
 }
 
+if (!string.IsNullOrWhiteSpace(pathBase))
+{
+    if (!pathBase.StartsWith("/")) pathBase = "/" + pathBase;
+    app.UsePathBase(pathBase);
+}
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

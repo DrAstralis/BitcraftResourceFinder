@@ -21,3 +21,25 @@ Public (no-login) submission of Bitcraft base resources + Admin confirmation wor
 - Fuzzy search uses canonical names and can be extended with Postgres `pg_trgm` if enabled.
 
 See `docs/` for API and data model details.
+
+Images Config:
+
+Folder name & config
+
+Keep images under wwwroot/images or set "Image:RootPath" accordingly in appsettings. Dev already ships with "Image:RootPath": "wwwroot/images". 
+
+The code above resolves absolute disk path from that setting using WebRoot/ContentRoot.
+
+Static files must be enabled (they are): app.UseStaticFiles(); in Program.cs. Don’t remove/move it after endpoint mapping. 
+
+Write permissions
+
+The hosting process must be able to write to the resolved images folder (e.g., wwwroot/images). Containers/App Services usually allow this; some locked-down IIS sites may need ACLs.
+
+Placeholder image
+
+Make sure wwwroot/images/placeholder-256.webp exists (used when a resource has no image). The view code expects it.
+
+Existing data
+
+Some rows already store URLs like "/images/…"; the ResolveImg() helper handles both "/images/…" and "~/images/…", so you don’t have to backfill the DB.
