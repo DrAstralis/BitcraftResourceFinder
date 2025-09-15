@@ -7,8 +7,9 @@
     var page = (int)(ViewBag.Page ?? 1);
     var pageSize = (int)(ViewBag.PageSize ?? 20);
     var pages = (total + pageSize - 1) / pageSize;
-    var types = ViewBag.Types as List<Bitcraft.ResourceFinder.Web.Models.TypeItem>;
-    var biomes = ViewBag.Biomes as List<Bitcraft.ResourceFinder.Web.Models.Biome>;
+    // ? Avoid CS8602 by coalescing ViewBag casts
+    var types = (ViewBag.Types as List<Bitcraft.ResourceFinder.Web.Models.TypeItem>) ?? new();
+    var biomes = (ViewBag.Biomes as List<Bitcraft.ResourceFinder.Web.Models.Biome>) ?? new();
     string? q = ViewBag.Query; int? tier = ViewBag.Tier; Guid? type = ViewBag.Type; Guid? biome = ViewBag.Biome; string? status = ViewBag.Status;
 }
 <div class="card p-3 mb-3">

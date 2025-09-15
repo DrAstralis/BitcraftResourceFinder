@@ -10,6 +10,165 @@
     var pages = (total + pageSize - 1) / pageSize;
 }
 <h3>Admin — @status</h3>
+    <div class="card mb-4">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <strong>JSON Import</strong>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#jsonImportCollapse" aria-expanded="false" aria-controls="jsonImportCollapse">
+                Toggle
+            </button>
+        </div>
+
+        <div id="jsonImportCollapse" class="collapse">
+            <div class="card-body">
+                <label class="form-label">Example JSON</label>
+                <pre class="bg-light p-3 rounded small mb-3" style="max-height:220px;overflow:auto">@Html.Raw(@"[
+    { ""name"": ""Lorem Ore"", ""tier"": 3, ""type"": ""Ore Vein"", ""biome"": ""Grasslands"" },
+    { ""name"": ""Ipsum Flower"", ""tier"": 1, ""type"": ""Flower"", ""biome"": ""Calm Forest"" }
+]")</pre>
+
+                <!-- Unified inline error area (used for client + server validation) -->
+                <div id="jsonImportErrors" class="alert alert-danger d-none position-relative" role="alert">
+                    <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Close"
+                            onclick="document.getElementById('jsonImportErrors').classList.add('d-none')"></button>
+                    <div class="fw-semibold mb-1">Import errors</div>
+                    <ul id="jsonImportErrorsList" class="mb-0"></ul>
+                </div>
+
+                <label for="jsonImportText" class="form-label">Paste JSON</label>
+                <textarea id="jsonImportText" class="form-control mb-3" rows="8" placeholder='[ { "name": "...", "tier": 1, "type": "Ore Vein", "biome": "Grasslands" } ]'></textarea>
+
+                <div class="d-flex gap-2">
+                    <button id="jsonImportSubmit" class="btn btn-primary" type="button">Submit</button>
+                    <small class="text-muted align-self-center">Max 256 KB, up to 200 items.</small>
+                </div>
+
+                <!-- Optional success toast inline -->
+                <div id="jsonImportSuccess" class="alert alert-success d-none mt-3">Imported successfully.</div>
+            </div>
+        </div>
+    </div>
+
+@section Scripts {
+        <script>
+            (function(){
+              const TEXTAREA_ID = 'jsonImportText';
+              const ERR_ID = 'jsonImportErrors';
+              const ERR_LIST_ID = 'jsonImportErrorsList';
+              const OK_ID = 'jsonImportSuccess';
+              const MAX_BYTES = 256 * 1024;     // 256 KB
+              const MAX_ITEMS = 200;
+
+              function showErrors(messages){
+                const box = document.getElementById(ERR_ID);
+                const ul = document.getElementById(ERR_LIST_ID);
+                ul.innerHTML = '';
+                (messages || []).forEach(m => {
+                  const li = document.createElement('li');
+                  li.textContent = m;
+                  ul.appendChild(li);
+                });
+                box.classList.toggle('d-none', !(messages && messages.length));
+              }
+
+              function hideErrors(){ document.getElementById(ERR_ID).classList.add('d-none'); }
+              function showOk(msg){
+                const ok = document.getElementById(OK_ID);
+                ok.textContent = msg || 'Imported successfully.';
+                ok.classList.remove('d-none');
+                setTimeout(()=> ok.classList.add('d-none'), 4000);
+              }
+
+              // crude client-side canonicalize (match server’s spirit)
+              function canon(s){
+                return (s || '')
+                  .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+                  .toLowerCase().replace(/[^a-z0-9\s-]/g,'')
+                  .trim().replace(/\s+/g,' ');
+              }
+
+              function validateClient(jsonText){
+                const errs = [];
+                // size
+                const bytes = new Blob([jsonText]).size;
+                if (bytes === 0) errs.push('Empty payload.');
+                if (bytes > MAX_BYTES) errs.push(`Payload too large (${bytes} bytes). Max ${MAX_BYTES} bytes.`);
+
+                let parsed = null;
+                if (!errs.length){
+                  try { parsed = JSON.parse(jsonText); }
+                  catch(e){ errs.push('Invalid JSON syntax.'); }
+                }
+                if (errs.length) return { ok:false, errors: errs };
+
+                if (!Array.isArray(parsed)) return { ok:false, errors:['Root must be an array of objects.'] };
+                if (parsed.length === 0) return { ok:false, errors:['No items provided.'] };
+                if (parsed.length > MAX_ITEMS) return { ok:false, errors:[`Too many items (${parsed.length}). Max ${MAX_ITEMS}.`] };
+
+                // per-item checks + intra-batch duplicates by canonical name
+                const seen = new Set();
+                const itemErrs = [];
+                parsed.forEach((it, i) => {
+                  const ctx = `Item ${i+1}`;
+                  if (typeof it !== 'object' || it === null){ itemErrs.push(`${ctx}: must be an object.`); return; }
+                  const { name, tier, type, biome } = it;
+                  if (!name || typeof name !== 'string' || !name.trim()) itemErrs.push(`${ctx}: 'name' required.`);
+                  if (name && name.length > 80) itemErrs.push(`${ctx}: 'name' too long (max 80).`);
+                  if (typeof tier !== 'number' || !Number.isInteger(tier) || tier < 1 || tier > 10) itemErrs.push(`${ctx}: 'tier' must be 1–10.`);
+                  if (!type || typeof type !== 'string') itemErrs.push(`${ctx}: 'type' required (name or slug).`);
+                  if (!biome || typeof biome !== 'string') itemErrs.push(`${ctx}: 'biome' required (name or slug).`);
+
+                  // batch duplicate by canonical name (name only; final dup check is server-side with Tier/Type/Biome)
+                  const key = canon(name || '');
+                  if (key){
+                    if (seen.has(key)) itemErrs.push(`${ctx}: duplicate 'name' within payload (${name}).`);
+                    seen.add(key);
+                  }
+                });
+
+                if (itemErrs.length) return { ok:false, errors:itemErrs };
+
+                return { ok:true, items: parsed };
+              }
+
+              async function submit(){
+                hideErrors();
+                const text = document.getElementById(TEXTAREA_ID).value || '';
+                const check = validateClient(text);
+                if (!check.ok){ showErrors(check.errors); return; }
+
+                try {
+                  const resp = await fetch('/api/resources/bulk-import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ items: check.items })
+                  });
+
+                  const data = await resp.json().catch(()=>({ ok:false, errors:['Server returned non-JSON.'] }));
+                  // Always re-use same error element for server-side issues
+                  if (!resp.ok || !data.ok){
+                    const errs = (data && (data.errors || [])).slice();
+                    // Include per-item rejects as lines
+                    (data.rejected || []).forEach(r => {
+                      (r.reasons || []).forEach(reason => errs.push(`Item ${r.index+1}: ${reason}`));
+                    });
+                    showErrors(errs.length ? errs : ['Import failed.']);
+                    return;
+                  }
+
+                  showOk(`Accepted ${data.accepted} item(s). Rejected ${data.rejected.length}.`);
+                  // Optional: clear textarea when fully clean
+                  if ((data.rejected || []).length === 0) document.getElementById(TEXTAREA_ID).value = '';
+                } catch (e){
+                  showErrors(['Network or server error.']);
+                }
+              }
+
+              document.getElementById('jsonImportSubmit').addEventListener('click', submit);
+            })();
+        </script>
+}
+
 <table class="table table-striped">
   <thead>
     <tr><th>Name</th><th>Tier</th><th>Type</th><th>Biome</th><th>Status</th><th></th></tr>
