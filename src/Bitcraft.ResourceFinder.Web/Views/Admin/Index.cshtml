@@ -117,12 +117,14 @@
                   if (!type || typeof type !== 'string') itemErrs.push(`${ctx}: 'type' required (name or slug).`);
                   if (!biome || typeof biome !== 'string') itemErrs.push(`${ctx}: 'biome' required (name or slug).`);
 
-                  // batch duplicate by canonical name (name only; final dup check is server-side with Tier/Type/Biome)
-                  const key = canon(name || '');
+                          // batch duplicate by canonical (name + biome)
+        const nameKey = canon(name || '');
+        const biomeKey = canon(biome || '');
+        const key = nameKey && biomeKey ? `${nameKey}|${biomeKey}` : '';
                   if (key){
-                    if (seen.has(key)) itemErrs.push(`${ctx}: duplicate 'name' within payload (${name}).`);
-                    seen.add(key);
-                  }
+  if (seen.has(key)) itemErrs.push(`${ctx}: duplicate 'name+biome' within payload (${name} - ${biome}).`);
+  seen.add(key);
+}
                 });
 
                 if (itemErrs.length) return { ok:false, errors:itemErrs };

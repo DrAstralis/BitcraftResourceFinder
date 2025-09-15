@@ -14,9 +14,13 @@ public static class SeedData
         "Misty Tundra","Rocky Garden","Swamp","Desert","Snowy Peaks","Jungle","Sawoods","Ocean"
     };
 
+    // SeedData.cs
     private static readonly string[] TYPES = new[] {
-        "Tree","Flower","Ore Vein","Sand","Mushroom","Fiber Plant","Rock Boulder","Research","Rock Outcrop","Clay","Huntable Animal"
-    };
+    "Tree","Flower","Ore Vein","Sand","Mushroom",
+    "Fiber Plant","Rock Boulder","Research","Rock Outcrop",
+    "Clay","Huntable Animal","Berry"
+};
+
 
     public static async Task EnsureSeedAsync(IServiceProvider sp, IConfiguration cfg)
     {
