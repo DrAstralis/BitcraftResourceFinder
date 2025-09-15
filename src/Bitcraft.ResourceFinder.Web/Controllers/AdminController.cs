@@ -33,17 +33,19 @@ public class AdminController : Controller
         ViewBag.Total = total;
         ViewBag.Page = page;
         ViewBag.PageSize = pageSize;
-        // No status filter anymore
         return View(items);
     }
-
 
     [HttpPost("/admin/resources/{id}/status")]
     public async Task<IActionResult> SetStatus(Guid id, string status)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
-        r.Status = status.Equals("confirmed", StringComparison.OrdinalIgnoreCase) ? ResourceStatus.Confirmed : ResourceStatus.Unconfirmed;
+
+        r.Status = status.Equals("confirmed", StringComparison.OrdinalIgnoreCase)
+            ? ResourceStatus.Confirmed
+            : ResourceStatus.Unconfirmed;
+
         r.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         return RedirectToAction("Index");
@@ -54,33 +56,34 @@ public class AdminController : Controller
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
+
         ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
-        ViewBag.Biomes = await _db.Biomes.OrderBy(t => t.Name).ToListAsync();
+        ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
         return View(r);
     }
 
     [HttpPost("/admin/resources/{id}/edit")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditPost(
-    Guid id,
-    int tier,
-    Guid typeId,
-    Guid biomeId,
-    string name,
-    bool removeImage = false,
-    IFormFile? file = null)
+        Guid id,
+        int tier,
+        Guid typeId,
+        Guid biomeId,
+        string name,
+        bool removeImage = false,
+        IFormFile? file = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
 
-        // Basic fields
+        // Apply posted fields so the view re-renders with user input on error
         r.Tier = tier;
         r.TypeId = typeId;
         r.BiomeId = biomeId;
-        r.Name = name.Trim();
-        r.CanonicalName = Models.SeedData.Canonicalize(name);
+        r.Name = (name ?? string.Empty).Trim();
+        r.CanonicalName = Models.SeedData.Canonicalize(r.Name);
 
-        // Image ops: remove, then (optionally) replace
+        // Handle image removal first
         if (removeImage)
         {
             r.Img256Url = null;
@@ -88,20 +91,36 @@ public class AdminController : Controller
             r.ImagePhash = null;
         }
 
+        // If a new file was provided, try to process it
         if (file is { Length: > 0 })
         {
-            // Process & save (same pipeline as API)
-            var (img256, img512, phash) = await _img.ProcessAndSaveAsync(file, id);
-            r.Img256Url = img256;
-            r.Img512Url = img512;
-            r.ImagePhash = phash;
+            try
+            {
+                var (img256, img512, phash) = await _img.ProcessAndSaveAsync(file, id);
+                r.Img256Url = img256;
+                r.Img512Url = img512;
+                r.ImagePhash = phash;
+            }
+            catch (InvalidOperationException ex)
+            {
+                // e.g. "Image too large (max 300 KB)." or "Unsupported image type."
+                ModelState.AddModelError(string.Empty, ex.Message);
+            }
+        }
+
+        if (!ModelState.IsValid)
+        {
+            // Re-populate dropdowns and return the same Edit view with validation messages
+            ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
+            ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
+            return View("Edit", r);
         }
 
         r.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+        TempData["AlertSuccess"] = "Resource updated.";
         return RedirectToAction("Index");
     }
-
 
     [HttpPost("/admin/resources/{id}/delete")]
     public async Task<IActionResult> Delete(Guid id)

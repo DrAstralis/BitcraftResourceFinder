@@ -55,26 +55,42 @@
   </form>
 </div>
 
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-@foreach (var r in Model) {
-  <div class="col">
-    <div class="card h-100">
-                <img src="@Url.Content(r.Img256Url ?? "~/images/placeholder-256.webp")" class="card-img-top" alt="@r.Name" />
-      <div class="card-body">
-        <h5 class="card-title">@r.Name</h5>
-        <p class="card-text mb-1"><strong>Tier:</strong> @r.Tier</p>
-        <p class="card-text mb-1"><strong>Type:</strong> @r.Type?.Name</p>
-        <p class="card-text mb-1"><strong>Biome:</strong> @r.Biome?.Name</p>
-        @if (r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed) {
-            <span class="badge badge-unconfirmed">Unconfirmed</span>
-        } else {
-            <span class="badge badge-confirmed">Confirmed</span>
-        }
-      </div>
-    </div>
-  </div>
-}
+<div class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 row-cols-xl-6 g-2 card-grid">
+    @foreach (var r in Model)
+    {
+        <div class="col">
+            <div class="card h-100 resource-card">
+                @{
+                    // Build safe URLs with fallbacks
+                    var src256 = Url.Content(r.Img256Url ?? "~/images/missing-256.webp");
+                    var src512 = Url.Content(r.Img512Url ?? "~/images/missing-512.webp");
+                }
+                <img src="@src256"
+                     srcset="@src512 2x"
+                     class="card-img-top"
+                     alt="@r.Name"
+                     loading="lazy"
+                     decoding="async" />
+
+                <div class="card-body">
+                    <div class="title">@r.Name</div>
+                    <div class="meta">T@(r.Tier) &bull; @(r.Type?.Name ?? "—") &bull; @(r.Biome?.Name ?? "—")</div>
+
+
+                    @if (r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed)
+                    {
+                        <span class="badge badge-unconfirmed">Unconfirmed</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-confirmed">Confirmed</span>
+                    }
+                </div>
+            </div>
+        </div>
+    }
 </div>
+
 
 @if (pages > 1) {
   <nav class="mt-3">
