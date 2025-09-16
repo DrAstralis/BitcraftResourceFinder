@@ -14,7 +14,8 @@ public class AdminController : Controller
     private readonly ImageService _img;
     public AdminController(AppDbContext db, ImageService img) { _db = db; _img = img; }
 
-    public async Task<IActionResult> Index(int page = 1)
+    // ?? Add front-end parity filters + paging
+    public async Task<IActionResult> Index(string? q, int? tier, Guid? type, Guid? biome, string? status, int page = 1)
     {
         const int pageSize = 20;
 
@@ -23,21 +24,39 @@ public class AdminController : Controller
             .Include(r => r.Biome)
             .AsQueryable();
 
+        // same filtering semantics as ResourcesController
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var cq = SeedData.Canonicalize(q);
+            query = query.Where(r => r.CanonicalName.Contains(cq) || r.Name.Contains(q));
+        }
+        if (tier.HasValue) query = query.Where(r => r.Tier == tier);
+        if (type.HasValue) query = query.Where(r => r.TypeId == type);
+        if (biome.HasValue) query = query.Where(r => r.BiomeId == biome);
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (status.Equals("confirmed", StringComparison.OrdinalIgnoreCase)) query = query.Where(r => r.Status == ResourceStatus.Confirmed);
+            if (status.Equals("unconfirmed", StringComparison.OrdinalIgnoreCase)) query = query.Where(r => r.Status == ResourceStatus.Unconfirmed);
+        }
+
         var total = await query.CountAsync();
         var items = await query
-            .OrderByDescending(r => r.CreatedAt)
+            .OrderByDescending(r => r.CreatedAt)   // keep newest-first for admin review
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        ViewBag.Total = total;
-        ViewBag.Page = page;
-        ViewBag.PageSize = pageSize;
+        // supply data for dropdowns and echo filters back to the view
+        ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
+        ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
+        ViewBag.Total = total; ViewBag.Page = page; ViewBag.PageSize = pageSize;
+        ViewBag.Query = q; ViewBag.Tier = tier; ViewBag.Type = type; ViewBag.Biome = biome; ViewBag.Status = status;
+
         return View(items);
     }
 
     [HttpPost("/admin/resources/{id}/status")]
-    public async Task<IActionResult> SetStatus(Guid id, string status)
+    public async Task<IActionResult> SetStatus(Guid id, string status, string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
@@ -48,30 +67,37 @@ public class AdminController : Controller
 
         r.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return LocalRedirect(returnUrl);
+
         return RedirectToAction("Index");
     }
 
+
     [HttpGet("/admin/resources/{id}/edit")]
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(Guid id, string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
 
         ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
         ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
+        ViewBag.ReturnUrl = returnUrl; // keep it for the form + Cancel
         return View(r);
     }
 
     [HttpPost("/admin/resources/{id}/edit")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditPost(
-        Guid id,
-        int tier,
-        Guid typeId,
-        Guid biomeId,
-        string name,
-        bool removeImage = false,
-        IFormFile? file = null)
+    Guid id,
+    int tier,
+    Guid typeId,
+    Guid biomeId,
+    string name,
+    bool removeImage = false,
+    IFormFile? file = null,
+    string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
@@ -83,7 +109,6 @@ public class AdminController : Controller
         r.Name = (name ?? string.Empty).Trim();
         r.CanonicalName = Models.SeedData.Canonicalize(r.Name);
 
-        // Handle image removal first
         if (removeImage)
         {
             await _img.MoveToDeleteAsync(id);
@@ -92,7 +117,6 @@ public class AdminController : Controller
             r.ImagePhash = null;
         }
 
-        // If a new file was provided, try to process it
         if (file is { Length: > 0 })
         {
             try
@@ -104,45 +128,44 @@ public class AdminController : Controller
             }
             catch (InvalidOperationException ex)
             {
-                // e.g. "Image too large (max 300 KB)." or "Unsupported image type."
                 ModelState.AddModelError(string.Empty, ex.Message);
             }
         }
 
         if (!ModelState.IsValid)
         {
-            // Re-populate dropdowns and return the same Edit view with validation messages
             ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
             ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
+            ViewBag.ReturnUrl = returnUrl;
             return View("Edit", r);
         }
 
         r.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         TempData["AlertSuccess"] = "Resource updated.";
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return LocalRedirect(returnUrl);
+
         return RedirectToAction("Index");
     }
 
     [HttpPost("/admin/resources/{id}/delete")]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
 
-        // Quarantine any existing image files before removing the row
-        try
-        {
-            await _img.MoveToDeleteAsync(id);
-        }
-        catch
-        {
-            // Optional: log the error; we don't block deletion if moving fails
-            // _logger.LogWarning(ex, "Failed to quarantine images for resource {Id}", id);
-        }
+        try { await _img.MoveToDeleteAsync(id); } catch { /* swallow */ }
 
         _db.Resources.Remove(r);
         await _db.SaveChangesAsync();
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return LocalRedirect(returnUrl);
+
         return RedirectToAction("Index");
     }
+
 
 }

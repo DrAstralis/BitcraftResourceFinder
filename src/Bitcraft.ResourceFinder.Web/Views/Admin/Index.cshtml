@@ -1,15 +1,82 @@
-
 @model IEnumerable<Bitcraft.ResourceFinder.Web.Models.Resource>
 @{
     ViewData["Title"] = "Admin — Review";
     Layout = "~/Views/Shared/_Layout.cshtml";
-    var status = (string)ViewBag.Status;
+
+    // paging
     var page = (int)ViewBag.Page;
     var pageSize = (int)ViewBag.PageSize;
     var total = (int)ViewBag.Total;
     var pages = (total + pageSize - 1) / pageSize;
+
+    // filters
+    string q = (string)ViewBag.Query ?? "";
+    int? selTier = (int?)ViewBag.Tier;
+    Guid? selType = (Guid?)ViewBag.Type;
+    Guid? selBiome = (Guid?)ViewBag.Biome;
+    string selStatus = (string)ViewBag.Status ?? "";
+
+    var types = (IEnumerable<Bitcraft.ResourceFinder.Web.Models.TypeItem>)ViewBag.Types ?? Enumerable.Empty<Bitcraft.ResourceFinder.Web.Models.TypeItem>();
+    var biomes = (IEnumerable<Bitcraft.ResourceFinder.Web.Models.Biome>)ViewBag.Biomes ?? Enumerable.Empty<Bitcraft.ResourceFinder.Web.Models.Biome>();
 }
-<h3>Admin — @status</h3>
+
+
+<h3>Admin — Review</h3>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-4">
+        <label class="form-label">Search</label>
+        <input name="q" class="form-control" placeholder="Name…" value="@q" />
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label">Tier</label>
+        <select name="tier" class="form-select">
+            <option value="">Any</option>
+            @for (var t = 1; t <= 10; t++)
+            {
+                <option value="@t" selected="@(selTier == t ? "selected" : null)">Tier @t</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label">Type</label>
+        <select name="type" class="form-select">
+            <option value="">Any</option>
+            @foreach (var t in types)
+            {
+                <option value="@t.Id" selected="@(selType == t.Id ? "selected" : null)">@t.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label">Biome</label>
+        <select name="biome" class="form-select">
+            <option value="">Any</option>
+            @foreach (var b in biomes)
+            {
+                <option value="@b.Id" selected="@(selBiome == b.Id ? "selected" : null)">@b.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select">
+            <option value="">Any</option>
+            <option value="confirmed" selected="@(string.Equals(selStatus, "confirmed", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Confirmed</option>
+            <option value="unconfirmed" selected="@(string.Equals(selStatus, "unconfirmed", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Unconfirmed</option>
+        </select>
+    </div>
+
+    <div class="col-md-3 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Filter</button>
+        <a class="btn btn-outline-secondary" href="@Url.Action("Index", "Admin")">Clear</a>
+    </div>
+</form>
+
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center justify-content-between">
             <strong>JSON Import</strong>
@@ -196,16 +263,21 @@
                     <!-- Confirm / Unconfirm -->
                     <form method="post" action="/admin/resources/@r.Id/status" class="d-inline">
                         <input type="hidden" name="status" value="@(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "confirmed" : "unconfirmed")" />
+                        <input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)" />
                         <button class="btn btn-sm btn-success">
                             @(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "Confirm" : "Unconfirm")
                         </button>
                     </form>
 
                     <!-- Edit -->
-                    <a class="btn btn-sm btn-primary" href="/admin/resources/@r.Id/edit">Edit</a>
+                    <a class="btn btn-sm btn-primary"
+                       href="@Url.Action("Edit", "Admin", new { id = r.Id, returnUrl = Context.Request.Path + Context.Request.QueryString })">
+                        Edit
+                    </a>
 
                     <!-- Delete -->
                     <form method="post" action="/admin/resources/@r.Id/delete" class="d-inline" onsubmit="return confirm('Delete this resource?');">
+                        <input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)" />
                         <button class="btn btn-sm btn-danger">Delete</button>
                     </form>
                 </td>
@@ -215,14 +287,17 @@
   </tbody>
 </table>
 
-@if (pages > 1) {
-  <nav class="mt-3">
-    <ul class="pagination">
-      @for (int p = 1; p <= pages; p++) {
-        <li class="page-item @(p==page? "active":"")">
-          <a class="page-link" href="@Url.Action("Index", new { status, page = p })">@p</a>
-        </li>
-      }
-    </ul>
-  </nav>
+@if (pages > 1)
+{
+    <nav class="mt-3">
+        <ul class="pagination">
+            @for (int p = 1; p <= pages; p++)
+            {
+                <li class="page-item @(p == page ? "active" : "")">
+                    <a class="page-link"
+                       href="@Url.Action("Index", new { q = q, tier = selTier, type = selType, biome = selBiome, status = selStatus, page = p })">@p</a>
+                </li>
+            }
+        </ul>
+    </nav>
 }
