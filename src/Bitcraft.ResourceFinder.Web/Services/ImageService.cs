@@ -18,6 +18,8 @@ public class ImageService
 
     public async Task<(string? img256, string? img512, string? pHash)> ProcessAndSaveAsync(IFormFile file, Guid resourceId)
     {
+        await MoveToDeleteAsync(resourceId);
+
         if (file == null || file.Length == 0) return (null, null, null);
         if (file.Length > 300 * 1024) throw new InvalidOperationException("Image too large (max 300 KB).");
 
@@ -71,6 +73,60 @@ public class ImageService
 
         string pHash = await ComputeAverageHashAsync(dest512);
         return (img256Url, img512Url, pHash);
+    }
+    public Task MoveToDeleteAsync(Guid resourceId)
+    {
+        // Resolve the same folder used by ProcessAndSaveAsync
+        var webRoot = _env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+
+        var configured = _cfg["Image:RootPath"];
+        string imagesFolder;
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            imagesFolder = Path.Combine(webRoot, "images");
+        }
+        else if (Path.IsPathRooted(configured))
+        {
+            imagesFolder = configured;
+        }
+        else
+        {
+            var trimmed = configured.TrimStart('~', '/', '\\');
+            if (trimmed.StartsWith("wwwroot", StringComparison.OrdinalIgnoreCase))
+                trimmed = trimmed.Substring("wwwroot".Length).TrimStart('/', '\\');
+
+            imagesFolder = Path.Combine(webRoot, trimmed);
+        }
+
+        Directory.CreateDirectory(imagesFolder);
+
+        var baseName = resourceId.ToString("N");
+        var src256 = Path.Combine(imagesFolder, baseName + "-256.webp");
+        var src512 = Path.Combine(imagesFolder, baseName + "-512.webp");
+
+        var toDelete = Path.Combine(imagesFolder, "ToDelete");
+        Directory.CreateDirectory(toDelete);
+
+        MoveIfExists(src256, Path.Combine(toDelete, Path.GetFileName(src256)));
+        MoveIfExists(src512, Path.Combine(toDelete, Path.GetFileName(src512)));
+
+        return Task.CompletedTask;
+    }
+
+    private static void MoveIfExists(string src, string dest)
+    {
+        if (!File.Exists(src)) return;
+
+        // Ensure uniqueness if a file with the same name is already quarantined
+        if (File.Exists(dest))
+        {
+            var dir = Path.GetDirectoryName(dest)!;
+            var name = Path.GetFileNameWithoutExtension(dest);
+            var ext = Path.GetExtension(dest);
+            dest = Path.Combine(dir, $"{name}-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid().ToString("N")[..8]}{ext}");
+        }
+
+        File.Move(src, dest);
     }
 
 

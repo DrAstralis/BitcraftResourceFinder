@@ -86,6 +86,7 @@ public class AdminController : Controller
         // Handle image removal first
         if (removeImage)
         {
+            await _img.MoveToDeleteAsync(id);
             r.Img256Url = null;
             r.Img512Url = null;
             r.ImagePhash = null;
@@ -127,8 +128,21 @@ public class AdminController : Controller
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
+
+        // Quarantine any existing image files before removing the row
+        try
+        {
+            await _img.MoveToDeleteAsync(id);
+        }
+        catch
+        {
+            // Optional: log the error; we don't block deletion if moving fails
+            // _logger.LogWarning(ex, "Failed to quarantine images for resource {Id}", id);
+        }
+
         _db.Resources.Remove(r);
         await _db.SaveChangesAsync();
         return RedirectToAction("Index");
     }
+
 }
