@@ -56,6 +56,7 @@ public class AdminController : Controller
     }
 
     [HttpPost("/admin/resources/{id}/status")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetStatus(Guid id, string status, string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
@@ -151,6 +152,7 @@ public class AdminController : Controller
     }
 
     [HttpPost("/admin/resources/{id}/delete")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(Guid id, string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);

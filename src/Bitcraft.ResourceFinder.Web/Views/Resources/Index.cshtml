@@ -17,7 +17,7 @@
     <div class="col-md-3">
       <input name="q" value="@q" class="form-control" placeholder="Search by name" />
     </div>
-    <div class="col-md-2">
+    <div class="col-md-1">
       <select class="form-select" name="tier">
         <option value="">Tier</option>
         @for (int i = 1; i <= 10; i++) {
@@ -41,9 +41,9 @@
         }
       </select>
     </div>
-    <div class="col-md-1">
+    <div class="col-md-2">
       <select class="form-select" name="status">
-        <option value="">Any</option>
+        <option value="">Status</option>
         <option value="confirmed" selected="@(status=="confirmed")">Confirmed</option>
         <option value="unconfirmed" selected="@(status=="unconfirmed")">Unconfirmed</option>
       </select>

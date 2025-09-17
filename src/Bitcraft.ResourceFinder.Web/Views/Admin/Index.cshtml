@@ -262,6 +262,7 @@
                 <td class="text-end">
                     <!-- Confirm / Unconfirm -->
                     <form method="post" action="/admin/resources/@r.Id/status" class="d-inline">
+                        @Html.AntiForgeryToken()
                         <input type="hidden" name="status" value="@(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "confirmed" : "unconfirmed")" />
                         <input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)" />
                         <button class="btn btn-sm btn-success">
@@ -277,6 +278,7 @@
 
                     <!-- Delete -->
                     <form method="post" action="/admin/resources/@r.Id/delete" class="d-inline" onsubmit="return confirm('Delete this resource?');">
+                        @Html.AntiForgeryToken()
                         <input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)" />
                         <button class="btn btn-sm btn-danger">Delete</button>
                     </form>

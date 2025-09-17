@@ -59,6 +59,7 @@ namespace Bitcraft.ResourceFinder.Web.Controllers.Api
             return Ok(r);
         }
 
+        [Authorize]
         [HttpPost("{id}/image")]
         public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
         {

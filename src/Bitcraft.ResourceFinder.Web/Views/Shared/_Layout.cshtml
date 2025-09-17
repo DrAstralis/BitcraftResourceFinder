@@ -68,8 +68,25 @@
   <div class="container-fluid">
     <a class="navbar-brand" href="/">Bitcraft Resource Finder</a>
     <div class="d-flex">
-      <a class="btn btn-outline-light me-2" href="/resources/new">Add Resource</a>
-      <a class="btn btn-warning" href="/admin">Admin</a>
+                @* Show ONLY to signed-in users *@
+                @if (User?.Identity?.IsAuthenticated == true)
+
+                {
+
+                    <a class="btn btn-outline-light me-2" href="/resources/new">Add Resource</a>
+
+                }
+                @* Show ONLY to Admins *@
+                @if (User?.IsInRole("Admin") == true)
+
+                {
+
+                    <a class="btn btn-warning" href="/admin">Admin</a>
+                }
+
+                <div class="ms-auto">
+                    <partial name="_LoginPartial" />
+                </div>
     </div>
   </div>
 </nav>

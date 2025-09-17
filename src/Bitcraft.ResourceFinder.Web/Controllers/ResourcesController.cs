@@ -1,9 +1,11 @@
 
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Bitcraft.ResourceFinder.Web.Data;
 using Bitcraft.ResourceFinder.Web.Models;
 using Bitcraft.ResourceFinder.Web.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace Bitcraft.ResourceFinder.Web.Controllers;
 
@@ -22,8 +24,13 @@ public class ResourcesController : Controller
     public async Task<IActionResult> Index(string? q, int? tier, Guid? type, Guid? biome, string? status, int page = 1)
     {
         const int pageSize = 20;
+        // If no status filter was provided at all (first visit / reset), default to confirmed
+        var statusParamProvided = Request?.Query.ContainsKey("status") == true;
+            if (!statusParamProvided)
+            status = "confirmed";
+        
         var query = _db.Resources
-            .Include(r => r.Type)
+                    .Include(r => r.Type)
             .Include(r => r.Biome)
             .AsQueryable();
 
@@ -55,6 +62,7 @@ public class ResourcesController : Controller
         return View(items);
     }
 
+    [Authorize]
     [HttpGet("/resources/new")]
     public async Task<IActionResult> New()
     {
@@ -63,6 +71,7 @@ public class ResourcesController : Controller
         return View();
     }
 
+    [Authorize]
     [HttpPost("/resources")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(int tier, Guid typeId, Guid biomeId, string name, IFormFile? image)
