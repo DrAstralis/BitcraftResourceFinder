@@ -71,10 +71,9 @@
                 </div>
             }
 
-            <div>
-                <input class="form-control" type="file" name="file" accept=".jpg,.jpeg,.png,.webp" />
-                <small class="text-muted">Optional. Upload a new image (≤300 KB). If “Remove image” is checked and you upload a new file, the new file wins.</small>
-            </div>
+            <!-- Image cropper (512×512 PNG) -->
+            <div class="image-crop-512" data-field="file" data-proxy-url="/image-proxy?url="></div>
+
         </div>
 
         <div class="col-md-12">
@@ -85,21 +84,9 @@
 </form>
 
 @section Scripts {
+    <script src="~/js/image-crop-512.js"></script>
     <script>
-        // Simple pre-check to avoid submitting >300 KB files
-        (function () {
-          const input = document.querySelector('input[type="file"][name="file"]');
-          if (!input) return;
-          input.addEventListener('change', function () {
-            const f = this.files && this.files[0];
-            if (!f) return;
-            const max = 300 * 1024; // 300 KB
-            if (f.size > max) {
-              alert('Selected image is ' + Math.round(f.size / 1024) + ' KB. Max allowed is 300 KB.');
-              this.value = ''; // clear the file input
-            }
-          });
-        })();
+        // Auto-detects the nearest <form>; no id needed
+        initImageCrop512('.image-crop-512');
     </script>
 }
-

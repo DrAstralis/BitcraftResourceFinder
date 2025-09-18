@@ -45,8 +45,8 @@
         <input class="form-control" name="name" placeholder="e.g., Iron Ore" required maxlength="80" />
       </div>
       <div class="col-md-12">
-        <label class="form-label">Image (≤ 300 KB; jpg/png/webp)</label>
-        <input class="form-control" type="file" name="image" accept="image/*" />
+                <label class="form-label">Image</label>
+                <div class="image-crop-512" data-field="image" data-proxy-url="/image-proxy?url="></div>
       </div>
       <div class="col-md-12">
         <button class="btn btn-primary">Submit</button>
@@ -55,8 +55,9 @@
     </div>
   </form>
 </div>
-@section Scripts{
-<script>
-  // Simple duplicate pre-check on blur (AJAX could be added later)
-</script>
+@section Scripts {
+    <script>
+        initImageCrop512('.image-crop-512');
+    </script>
 }
+
