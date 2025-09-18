@@ -62,16 +62,19 @@
             <div class="card h-100 resource-card">
                 @{
                     // Build safe URLs with fallbacks
-                    var src256 = Url.Content(r.Img256Url ?? "~/images/missing-256.webp");
-                    var src512 = Url.Content(r.Img512Url ?? "~/images/missing-512.webp");
+                    var src256 = Url.Content(r.Img256Url ?? "~/images/missing-256.png");
+                    var src512 = Url.Content(r.Img512Url ?? "~/images/missing-512.png");
                 }
+                <div class="overlay-container">
                 <img src="@src256"
                      srcset="@src512 2x"
                      class="card-img-top"
                      alt="@r.Name"
                      loading="lazy"
                      decoding="async" />
+                    <div class="overlay"></div>
 
+</div>
                 <div class="card-body">
                     <div class="title">@r.Name</div>
                     <div class="meta">T@(r.Tier) &bull; @(r.Type?.Name ?? "—") &bull; @(r.Biome?.Name ?? "—")</div>

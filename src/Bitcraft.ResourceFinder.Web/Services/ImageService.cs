@@ -1,4 +1,4 @@
-
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -56,20 +56,20 @@ public class ImageService
         Directory.CreateDirectory(imagesFolder);
 
         var baseName = resourceId.ToString("N");
-        var dest256 = Path.Combine(imagesFolder, baseName + "-256.webp");
-        var dest512 = Path.Combine(imagesFolder, baseName + "-512.webp");
+        var dest256 = Path.Combine(imagesFolder, baseName + "-256.png");
+        var dest512 = Path.Combine(imagesFolder, baseName + "-512.png");
 
-        // Resize and save as WebP
+        // Resize and save as PNG (lossless). Adjust CompressionLevel if you want smaller files.
         using (var clone = img.Clone(i => i.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(256, 256) })))
-            await clone.SaveAsWebpAsync(dest256, new WebpEncoder { Quality = 80 });
+            await clone.SaveAsPngAsync(dest256, new PngEncoder { CompressionLevel = PngCompressionLevel.Level6 });
 
         using (var clone = img.Clone(i => i.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(512, 512) })))
-            await clone.SaveAsWebpAsync(dest512, new WebpEncoder { Quality = 80 });
+            await clone.SaveAsPngAsync(dest512, new PngEncoder { CompressionLevel = PngCompressionLevel.Level6 });
 
         // Return app-relative URLs so PathBase is honored (views will call Url.Content)
         var urlBase = "~/images/" + baseName;
-        var img256Url = urlBase + "-256.webp";
-        var img512Url = urlBase + "-512.webp";
+        var img256Url = urlBase + "-256.png";
+        var img512Url = urlBase + "-512.png";
 
         string pHash = await ComputeAverageHashAsync(dest512);
         return (img256Url, img512Url, pHash);
@@ -101,8 +101,8 @@ public class ImageService
         Directory.CreateDirectory(imagesFolder);
 
         var baseName = resourceId.ToString("N");
-        var src256 = Path.Combine(imagesFolder, baseName + "-256.webp");
-        var src512 = Path.Combine(imagesFolder, baseName + "-512.webp");
+        var src256 = Path.Combine(imagesFolder, baseName + "-256.png");
+        var src512 = Path.Combine(imagesFolder, baseName + "-512.png");
 
         var toDelete = Path.Combine(imagesFolder, "ToDelete");
         Directory.CreateDirectory(toDelete);
