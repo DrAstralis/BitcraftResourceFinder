@@ -46,6 +46,7 @@
       </div>
       <div class="col-md-12">
                 <label class="form-label">Image</label>
+                <!-- Image cropper (512×512 PNG) -->
                 <div class="image-crop-512" data-field="image" data-proxy-url="/image-proxy?url="></div>
       </div>
       <div class="col-md-12">
@@ -56,7 +57,9 @@
   </form>
 </div>
 @section Scripts {
+    <script src="~/js/image-crop-512.js"></script>
     <script>
+        // Auto-detects the nearest <form>; no id needed
         initImageCrop512('.image-crop-512');
     </script>
 }

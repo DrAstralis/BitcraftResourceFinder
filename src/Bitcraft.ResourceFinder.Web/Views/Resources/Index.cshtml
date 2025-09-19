@@ -61,9 +61,13 @@
         <div class="col">
             <div class="card h-100 resource-card">
                 @{
-                    // Build safe URLs with fallbacks
-                    var src256 = Url.Content(r.Img256Url ?? "~/images/missing-256.png");
-                    var src512 = Url.Content(r.Img512Url ?? "~/images/missing-512.png");
+                    var updated = Convert.ToDateTime(r.UpdatedAt);
+                    var created = Convert.ToDateTime(r.CreatedAt);
+                    var dt = (updated > created) ? updated : created;
+                    var ver = dt.ToFileTimeUtc();
+
+                    var src256 = Url.Content((r.Img256Url ?? "~/images/missing-256.png") + "?v=" + ver);
+                    var src512 = Url.Content((r.Img512Url ?? "~/images/missing-512.png") + "?v=" + ver);
                 }
                 <div class="overlay-container">
                 <img src="@src256"

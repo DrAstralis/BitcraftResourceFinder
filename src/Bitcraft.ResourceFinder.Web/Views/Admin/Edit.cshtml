@@ -60,8 +60,19 @@
 
             @if (!string.IsNullOrWhiteSpace(Model.Img256Url) || !string.IsNullOrWhiteSpace(Model.Img512Url))
             {
+
                 <div class="mb-2">
-                    <img src="@Url.Content(Model.Img256Url ?? Model.Img512Url)"
+                    @{
+                        // Works whether these are DateTime or DateTime?
+                        var updated = Convert.ToDateTime(Model.UpdatedAt);
+                        var created = Convert.ToDateTime(Model.CreatedAt);
+                        var dt = (updated > created) ? updated : created; // pick the newer one
+                        var ver = dt.ToFileTimeUtc();
+
+                        var imgUrl = Model.Img256Url ?? Model.Img512Url ?? "~/images/missing-256.png";
+                        var currentImg = Url.Content(imgUrl + "?v=" + ver);
+                    }
+                    <img src="@currentImg"
                          alt="Current image"
                          style="max-width:256px; height:auto; border-radius:8px;" />
                 </div>

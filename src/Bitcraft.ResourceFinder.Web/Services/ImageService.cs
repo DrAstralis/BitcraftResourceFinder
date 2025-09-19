@@ -21,7 +21,7 @@ public class ImageService
         await MoveToDeleteAsync(resourceId);
 
         if (file == null || file.Length == 0) return (null, null, null);
-        if (file.Length > 300 * 1024) throw new InvalidOperationException("Image too large (max 300 KB).");
+        if (file.Length > 500 * 1024) throw new InvalidOperationException("Image too large (max 500 KB).");
 
         var allowed = new[] { "image/jpeg", "image/png", "image/webp" };
         if (!allowed.Contains(file.ContentType.ToLower())) throw new InvalidOperationException("Unsupported image type.");

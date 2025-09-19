@@ -26,13 +26,9 @@ class ImageCrop512 {
             <input type="file" accept="image/*" class="ic512-file" hidden>
             Upload from file
           </label>
-          <div class="ic512-url">
-            <input type="text" class="ic512-url-input" placeholder="Paste image URL…">
-            <button type="button" class="ic512-btn ic512-load-url">Load URL</button>
-          </div>
-          <button type="button" class="ic512-btn ic512-paste-help" title="Press Ctrl/Cmd+V to paste from clipboard">
-            📋 Paste from clipboard
-          </button>
+          <div class="ic512-btn ic512-paste-help" role="note" aria-label="Press Ctrl/Cmd+V to paste from clipboard" title="Press Ctrl/Cmd+V to paste from clipboard" style="cursor:default;">
+            📋Or Press Ctrl/Cmd+V to Paste from clipboard
+           </div>
           <div class="ic512-spacer"></div>
           <button type="button" class="ic512-btn ic512-reset" disabled>Reset</button>
         </div>
@@ -51,8 +47,6 @@ class ImageCrop512 {
       </div>
     `;
         this.$file = this.el.querySelector(".ic512-file");
-        this.$url = this.el.querySelector(".ic512-url-input");
-        this.$loadUrl = this.el.querySelector(".ic512-load-url");
         this.$reset = this.el.querySelector(".ic512-reset");
         this.$use = this.el.querySelector(".ic512-use");
         this.$error = this.el.querySelector(".ic512-error");
@@ -111,8 +105,6 @@ class ImageCrop512 {
             const f = e.target.files && e.target.files[0];
             if (f) this._loadFromFile(f);
         });
-        this.$loadUrl.addEventListener("click", () => this._loadFromUrl(this.$url.value.trim()));
-        this.$url.addEventListener("keydown", (e) => { if (e.key === "Enter") this.$loadUrl.click(); });
         this.$reset.addEventListener("click", () => this._resetState());
 
         window.addEventListener("paste", (e) => this._onPaste(e));
@@ -490,27 +482,65 @@ class ImageCrop512 {
     }
 
     async _onFormSubmit(e) {
-        if (!this.img) return; // let normal submit if user never loaded an image
+        // Let normal submit happen if no image was loaded
+        if (!this.img) return;
+
         e.preventDefault();
+
+        const MAX_BYTES = 500 * 1024; // 500 KB, PNG-only
+
         try {
+            // Export current crop as PNG (your existing helper should produce 512x512)
             const blob = await this._exportPNGBlob();
+            if (!blob) {
+                this._err("Could not export PNG from canvas.");
+                return;
+            }
+
+            // Client-side size guard so we don't post something the server will reject
+            if (blob.size > MAX_BYTES) {
+                const kb = Math.ceil(blob.size / 1024);
+                this._err(`PNG is ${kb} KB (max 500 KB). Try cropping tighter or reducing detail.`);
+                return;
+            }
+
             const fd = new FormData(this.$form);
             fd.delete(this.opts.fieldName);
             fd.append(this.opts.fieldName, new File([blob], "crop-512.png", { type: "image/png" }));
+
             const method = (this.$form.getAttribute("method") || "POST").toUpperCase();
             const resp = await fetch(this.$form.action, { method, body: fd, credentials: "same-origin" });
+
+            // Follow server redirects
             if (resp.redirected) { window.location.href = resp.url; return; }
-            const ct = resp.headers.get("Content-Type") || "";
+
+            const ct = (resp.headers.get("Content-Type") || "").toLowerCase();
+
+            // Handle JSON with a redirect (e.g., { redirect: "/resources/123" })
             if (ct.includes("application/json")) {
-                const data = await resp.json();
-                if (data.redirect) { window.location.href = data.redirect; return; }
+                const data = await resp.json().catch(() => null);
+                if (data && data.redirect) { window.location.href = data.redirect; return; }
             }
-            if (resp.ok) window.location.reload();
-            else this._err(`Upload failed (${resp.status})`);
+
+            // If server returned HTML (e.g., validation summary), render it so errors are visible
+            if (ct.includes("text/html")) {
+                const html = await resp.text();
+                document.open(); document.write(html); document.close();
+                return;
+            }
+
+            // Fallbacks
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                this._err(`Upload failed (${resp.status})`);
+            }
         } catch (err) {
-            this._err(err.message || String(err));
+            this._err(err?.message || String(err));
         }
     }
+
+
 
     _err(msg = null) {
         if (!msg) { this.$error.hidden = true; this.$error.textContent = ""; return; }
