@@ -43,7 +43,7 @@
     </div>
     <div class="col-md-2">
       <select class="form-select" name="status">
-        <option value="">Status</option>
+        <option value="any" selected="@(string.IsNullOrEmpty(status) || status == "any")">Status</option>
         <option value="confirmed" selected="@(status=="confirmed")">Confirmed</option>
         <option value="unconfirmed" selected="@(status=="unconfirmed")">Unconfirmed</option>
       </select>

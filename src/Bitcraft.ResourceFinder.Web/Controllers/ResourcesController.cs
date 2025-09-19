@@ -42,10 +42,12 @@ public class ResourcesController : Controller
         if (tier.HasValue) query = query.Where(r => r.Tier == tier);
         if (type.HasValue) query = query.Where(r => r.TypeId == type);
         if (biome.HasValue) query = query.Where(r => r.BiomeId == biome);
-        if (!string.IsNullOrWhiteSpace(status))
+        if (!string.IsNullOrWhiteSpace(status) && !status.Equals("any", StringComparison.OrdinalIgnoreCase))
         {
-            if (status.Equals("confirmed", StringComparison.OrdinalIgnoreCase)) query = query.Where(r => r.Status == ResourceStatus.Confirmed);
-            if (status.Equals("unconfirmed", StringComparison.OrdinalIgnoreCase)) query = query.Where(r => r.Status == ResourceStatus.Unconfirmed);
+            if (status.Equals("confirmed", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(r => r.Status == ResourceStatus.Confirmed);
+            if (status.Equals("unconfirmed", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(r => r.Status == ResourceStatus.Unconfirmed);
         }
 
         var total = await query.CountAsync();
