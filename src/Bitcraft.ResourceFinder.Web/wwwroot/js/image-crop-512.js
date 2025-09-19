@@ -1,5 +1,5 @@
 ﻿/*! ImageCrop512: fixed 512×512 export with file/URL/clipboard + zoom/pan
-    Vanilla JS. No dependencies. Auto-detects host <form> or use data-form / formSelector.
+   Vanilla JS. No dependencies. Auto-detects host <form> or use data-form / formSelector.
 */
 class ImageCrop512 {
     constructor(container, opts) {
@@ -43,7 +43,7 @@ class ImageCrop512 {
         <canvas class="ic512-preview" width="${this.opts.previewSize}" height="${this.opts.previewSize}" aria-label="Live preview"></canvas>
       </div>
       <div class="ic512-actions">
-        <button type="button" class="ic512-btn ic512-use" disabled>Use 512×512 PNG</button>
+        <button type="button" class="ic512-btn ic512-use" disabled>Use 512×512 WebP</button>
       </div>
     `;
         this.$file = this.el.querySelector(".ic512-file");
@@ -70,7 +70,7 @@ class ImageCrop512 {
         if (!this.$form) {
             console.warn(
                 "ImageCrop512: host <form> not found. Place the widget inside a form or pass data-form/formSelector. " +
-                "Submit interception is disabled; 'Use 512×512 PNG' will still export."
+                "Submit interception is disabled; 'Use 512×512 WebP' will still export."
             );
         } else if (!this.opts.fieldName) {
             // fieldName from data-field if possible
@@ -467,8 +467,8 @@ class ImageCrop512 {
         ox.imageSmoothingEnabled = true;
         ox.imageSmoothingQuality = "high";
         ox.drawImage(this.img, x, y, w, h, 0, 0, 512, 512);
-        const blob = await new Promise(res => out.toBlob(res, "image/png"));
-        if (!blob) throw new Error("PNG export failed");
+        const blob = await new Promise(res => out.toBlob(res, "image/webp", 0.85));
+        if (!blob) throw new Error("WebP export failed");
         return blob;
     }
 
@@ -487,26 +487,26 @@ class ImageCrop512 {
 
         e.preventDefault();
 
-        const MAX_BYTES = 500 * 1024; // 500 KB, PNG-only
+        const MAX_BYTES = 500 * 1024; // 500 KB
 
         try {
-            // Export current crop as PNG (your existing helper should produce 512x512)
+            // Export current crop (helper returns 512x512 WebP)
             const blob = await this._exportPNGBlob();
             if (!blob) {
-                this._err("Could not export PNG from canvas.");
+                this._err("Could not export image from canvas.");
                 return;
             }
 
             // Client-side size guard so we don't post something the server will reject
             if (blob.size > MAX_BYTES) {
                 const kb = Math.ceil(blob.size / 1024);
-                this._err(`PNG is ${kb} KB (max 500 KB). Try cropping tighter or reducing detail.`);
+                this._err(`Image is ${kb} KB (max 500 KB). Try cropping tighter or reducing detail.`);
                 return;
             }
 
             const fd = new FormData(this.$form);
             fd.delete(this.opts.fieldName);
-            fd.append(this.opts.fieldName, new File([blob], "crop-512.png", { type: "image/png" }));
+            fd.append(this.opts.fieldName, new File([blob], "crop-512.webp", { type: "image/webp" }));
 
             const method = (this.$form.getAttribute("method") || "POST").toUpperCase();
             const resp = await fetch(this.$form.action, { method, body: fd, credentials: "same-origin" });
