@@ -16,3 +16,4 @@ dist/
 
 # Rider
 .idea/
+/publish
