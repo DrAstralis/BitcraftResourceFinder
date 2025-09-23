@@ -75,7 +75,7 @@
             right: 0;
             height: 100%;
             width: 100%;
-            background-image: url(images/overlay.png);
+            background-image: url('@Url.Content("~/images/overlay.png")');
             background-size: 100%;
             background-position: center;
         }
@@ -84,14 +84,14 @@
 <body class="bg-light">
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
   <div class="container-fluid">
-    <a class="navbar-brand" href="/">Bitcraft Resource Finder</a>
+    <a class="navbar-brand" href="~/">Bitcraft Resource Finder</a>
     <div class="d-flex">
                 @* Show ONLY to signed-in users *@
                 @if (User?.Identity?.IsAuthenticated == true)
 
                 {
 
-                    <a class="btn btn-outline-light me-2" href="/resources/new">Add Resource</a>
+                    <a class="btn btn-outline-light me-2" href="~/resources/new">Add Resource</a>
 
                 }
                 @* Show ONLY to Admins *@
@@ -99,7 +99,7 @@
 
                 {
 
-                    <a class="btn btn-warning" href="/admin">Admin</a>
+                    <a class="btn btn-warning" href="~/admin">Admin</a>
                 }
 
                 <div class="ms-auto">

@@ -83,13 +83,16 @@
             }
 
             <!-- Image cropper (512×512 PNG) -->
-            <div class="image-crop-512" data-field="file" data-proxy-url="/image-proxy?url="></div>
+            <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+            <div class="image-crop-512" data-field="file" data-proxy-url="@Url.Content("~/image-proxy?url=")"></div>
+
+
 
         </div>
 
         <div class="col-md-12">
             <button class="btn btn-primary">Save</button>
-            <a class="btn btn-secondary" href="/admin">Cancel</a>
+            <a class="btn btn-secondary" href="@(ViewBag.ReturnUrl ?? Url.Content("~/admin"))">Cancel</a>
         </div>
     </div>
 </form>

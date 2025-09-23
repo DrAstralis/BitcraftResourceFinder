@@ -7,7 +7,7 @@
     var biomes = (ViewBag.Biomes as IEnumerable<Biome>) ?? Enumerable.Empty<Biome>();
 }
 <div class="card p-4">
-  <form method="post" action="/resources" enctype="multipart/form-data">
+  <form method="post" action="~/resources" enctype="multipart/form-data">
         @Html.AntiForgeryToken()
         @if (!ViewData.ModelState.IsValid)
         {
@@ -47,7 +47,7 @@
       <div class="col-md-12">
                 <label class="form-label">Image</label>
                 <!-- Image cropper (512×512 PNG) -->
-                <div class="image-crop-512" data-field="image" data-proxy-url="/image-proxy?url="></div>
+                <div class="image-crop-512" data-field="image" data-proxy-url="~/image-proxy?url="></div>
       </div>
       <div class="col-md-12">
         <button class="btn btn-primary">Submit</button>
