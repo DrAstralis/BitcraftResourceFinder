@@ -79,11 +79,22 @@
                     <div class="overlay"></div>
 
 </div>
-                <div class="card-body">
-                    <div class="title">@r.Name</div>
-                    <div class="meta">T@(r.Tier) &bull; @(r.Type?.Name ?? "—") &bull; @(r.Biome?.Name ?? "—")</div>
+                <div class="card-body position-relative">
+                    <div class="position-absolute" style="top:0.75rem; right:0.75rem;">
+                        <a class="btn btn-sm btn-outline-danger me-1" href="/resources/@r.Id/report">Report</a>
+                        @if (User?.Identity?.IsAuthenticated ?? false)
+                        {
+                            if (string.IsNullOrEmpty(r.Img256Url))
+                            {
+                                <a class="btn btn-sm btn-outline-primary" href="/resources/@r.Id/add-image">Add image</a>
+                            }
+                        }
+                    </div>
 
-
+                    <h5 class="card-title pe-5">@r.Name</h5>
+                    <p class="card-text mb-1"><strong>Tier:</strong> @r.Tier</p>
+                    <p class="card-text mb-1"><strong>Type:</strong> @r.Type?.Name</p>
+                    <p class="card-text mb-1"><strong>Biome:</strong> @r.Biome?.Name</p>
                     @if (r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed)
                     {
                         <span class="badge badge-unconfirmed">Unconfirmed</span>
@@ -93,6 +104,7 @@
                         <span class="badge badge-confirmed">Confirmed</span>
                     }
                 </div>
+
             </div>
         </div>
     }

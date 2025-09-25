@@ -242,51 +242,46 @@
   <thead>
         <tr><th>Name</th><th>Tier</th><th>Type</th><th>Biome</th><th>Has Image</th><th>Status</th><th></th></tr>
   </thead>
-  <tbody>
+    <tbody>
+        @{
+            var openReports = ViewBag.OpenReports as Dictionary<Guid, int>;
+            var pendingCounts = ViewBag.PendingCounts as Dictionary<Guid, int>;
+        }
         @foreach (var r in Model)
         {
-            <tr>
-                <td>@r.Name</td>
+            var hasReport = openReports != null && openReports.ContainsKey(r.Id);
+            var hasPending = pendingCounts != null && pendingCounts.ContainsKey(r.Id);
+            var trClass = hasReport ? "table-danger" : (hasPending ? "table-warning" : "");
+            <tr class="@trClass">
+                <td>
+                    @r.Name
+                    @if (hasReport)
+                    {
+                        <span class="badge bg-danger ms-2">Reported</span>
+                    }
+                    @if (hasPending)
+                    {
+                        <span class="badge bg-warning text-dark ms-1">Pending images: @pendingCounts[r.Id]</span>
+                    }
+                </td>
                 <td>@r.Tier</td>
                 <td>@r.Type?.Name</td>
                 <td>@r.Biome?.Name</td>
-                <td>
-                    @{
-                        var hasImage = !string.IsNullOrWhiteSpace(r.Img256Url) || !string.IsNullOrWhiteSpace(r.Img512Url);
-
-                    }
-                    <span class="badge @(hasImage ? "bg-success" : "bg-secondary")">@(hasImage ? "Yes" : "No")</span>
-
-                </td>
                 <td>@r.Status</td>
                 <td class="text-end">
-                    <!-- Confirm / Unconfirm -->
-                    <form method="post" action="~/admin/resources/@r.Id/status" class="d-inline">
-                        @Html.AntiForgeryToken()
+                    <form method="post" action="/admin/resources/@r.Id/status" class="d-inline">
                         <input type="hidden" name="status" value="@(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "confirmed" : "unconfirmed")" />
-                        <input type="hidden" name="returnUrl" value="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)" />
-                        <button class="btn btn-sm btn-success">
-                            @(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "Confirm" : "Unconfirm")
-                        </button>
+                        <button class="btn btn-sm btn-success">@(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "Confirm" : "Unconfirm")</button>
                     </form>
-
-                    <!-- Edit -->
-                    <a class="btn btn-sm btn-primary"
-                       href="@Url.Action("Edit", "Admin", new { id = r.Id, returnUrl = Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString })">
-                        Edit
-                    </a>
-
-                    <!-- Delete -->
-                    <form method="post" action="~/admin/resources/@r.Id/delete" class="d-inline" onsubmit="return confirm('Delete this resource?');">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="returnUrl" value="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)" />
+                    <a class="btn btn-sm btn-primary" href="/admin/resources/@r.Id/edit">Review</a>
+                    <form method="post" action="/admin/resources/@r.Id/delete" class="d-inline" onsubmit="return confirm('Delete this resource?');">
                         <button class="btn btn-sm btn-danger">Delete</button>
                     </form>
                 </td>
+            </tr>
+        }
+    </tbody>
 
-    </tr>
-  }
-  </tbody>
 </table>
 
 @if (pages > 1)

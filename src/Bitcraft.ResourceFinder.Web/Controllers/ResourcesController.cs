@@ -3,9 +3,11 @@ using Bitcraft.ResourceFinder.Web.Data;
 using Bitcraft.ResourceFinder.Web.Models;
 using Bitcraft.ResourceFinder.Web.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+
 
 namespace Bitcraft.ResourceFinder.Web.Controllers;
 
@@ -15,10 +17,11 @@ public class ResourcesController : Controller
     private readonly ModerationService _mod;
     private readonly DuplicateService _dup;
     private readonly ImageService _img;
-
-    public ResourcesController(AppDbContext db, ModerationService mod, DuplicateService dup, ImageService img)
+    private readonly UserManager<IdentityUser> _userMgr;
+    public ResourcesController(AppDbContext db, ModerationService mod, DuplicateService dup, ImageService img,
+                               UserManager<IdentityUser> userMgr)
     {
-        _db = db; _mod = mod; _dup = dup; _img = img;
+        _db = db; _mod = mod; _dup = dup; _img = img; _userMgr = userMgr;
     }
 
     public async Task<IActionResult> Index(string? q, int? tier, Guid? type, Guid? biome, string? status, int page = 1)
@@ -146,6 +149,91 @@ public class ResourcesController : Controller
         }
 
         TempData["Success"] = "Submitted! An admin will review and confirm.";
+        return RedirectToAction("Index");
+    }
+
+    // --- NEW: Add Image (only if no accepted image exists) ---
+    [Authorize]
+    [HttpGet("/resources/{id}/add-image")]
+    public async Task<IActionResult> AddImage(Guid id)
+    {
+        var r = await _db.Resources.FindAsync(id);
+        if (r == null) return NotFound();
+        if (!string.IsNullOrEmpty(r.Img256Url)) return BadRequest("This resource already has an accepted image.");
+        return View(r);
+    }
+
+    [Authorize]
+    [HttpPost("/resources/{id}/add-image")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddImagePost(Guid id, IFormFile image)
+    {
+        var r = await _db.Resources.FindAsync(id);
+        if (r == null) return NotFound();
+        if (!string.IsNullOrEmpty(r.Img256Url)) return BadRequest("This resource already has an accepted image.");
+        if (image == null) return BadRequest("No image.");
+
+        // Enforce max 10 pending images
+        var pendingCount = await _db.PendingImages.CountAsync(p => p.ResourceId == id);
+        if (pendingCount >= 10) return BadRequest("Pending image limit reached (10).");
+
+        var pending = new PendingImage { ResourceId = id, UploadedByUserId = _userMgr.GetUserId(User) };
+        _db.PendingImages.Add(pending);
+        await _db.SaveChangesAsync(); // to get Id
+
+        try
+        {
+            var (i256, i512, ph) = await _img.ProcessAndSavePendingAsync(image, pending.Id);
+            pending.Img256Url = i256; pending.Img512Url = i512; pending.ImagePhash = ph;
+            await _db.SaveChangesAsync();
+            TempData["Success"] = "Thanks! Your image is awaiting admin review.";
+        }
+        catch (Exception ex)
+        {
+            _db.PendingImages.Remove(pending);
+            await _db.SaveChangesAsync();
+            return BadRequest(ex.Message);
+        }
+
+        return RedirectToAction("Index");
+    }
+
+    [Authorize]
+    [HttpGet("/resources/{id}/report")]
+    public async Task<IActionResult> Report(Guid id)
+    {
+        var r = await _db.Resources.FindAsync(id);
+        if (r == null) return NotFound();
+        ViewBag.Resource = r;
+        return View(new ReportForm());
+    }
+
+    [Authorize]
+    [HttpPost("/resources/{id}/report")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReportPost(Guid id, ReportForm form)
+    {
+        var r = await _db.Resources.FindAsync(id);
+        if (r == null) return NotFound();
+
+        // only allow AcceptedImage target if there is an accepted image
+        if (form.Target == ReportTargetType.AcceptedImage && string.IsNullOrEmpty(r.Img256Url))
+            return BadRequest("There is no accepted image to report for this resource.");
+
+        var rep = new Report
+        {
+            ResourceId = id,
+            Target = form.Target,
+            Reason = form.Reason,
+            Notes = (form.Notes ?? "").Trim(),
+            Status = ReportStatus.Open,
+            CreatedByUserId = _userMgr.GetUserId(User),
+            CreatedAt = DateTime.UtcNow
+        };
+        _db.Reports.Add(rep);
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Report submitted. Thanks for helping moderate the content.";
         return RedirectToAction("Index");
     }
 }

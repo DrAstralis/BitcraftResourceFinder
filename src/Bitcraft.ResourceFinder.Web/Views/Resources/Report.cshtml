@@ -1,0 +1,35 @@
+﻿@model Bitcraft.ResourceFinder.Web.Models.ReportForm
+@{
+    ViewData["Title"] = "Report";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var res = ViewBag.Resource as Bitcraft.ResourceFinder.Web.Models.Resource;
+}
+<h3>Report “@res?.Name”</h3>
+<div class="card p-4">
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">What are you reporting?</label>
+            <select class="form-select" name="Target">
+                <option value="0">Resource info</option>
+                @if (!string.IsNullOrEmpty(res?.Img256Url))
+                {
+                    <option value="1">Accepted image</option>
+                }
+            </select>
+
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Reason</label>
+      <select class="form-select" name="Reason">
+        <option value="0">Incorrect</option>
+        <option value="1">Violates policy</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Notes (optional)</label>
+      <textarea class="form-control" name="Notes" rows="3"></textarea>
+    </div>
+    <button class="btn btn-danger">Submit report</button>
+    <a class="btn btn-secondary" href="/resources">Cancel</a>
+  </form>
+</div>

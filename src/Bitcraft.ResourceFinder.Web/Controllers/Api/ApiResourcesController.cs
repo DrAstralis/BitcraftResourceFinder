@@ -1,9 +1,10 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Bitcraft.ResourceFinder.Web.Data;
 using Bitcraft.ResourceFinder.Web.Models;
 using Bitcraft.ResourceFinder.Web.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bitcraft.ResourceFinder.Web.Controllers.Api
 {
@@ -59,7 +60,7 @@ namespace Bitcraft.ResourceFinder.Web.Controllers.Api
             return Ok(r);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPost("{id}/image")]
         public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
         {
@@ -70,6 +71,29 @@ namespace Bitcraft.ResourceFinder.Web.Controllers.Api
             await _db.SaveChangesAsync();
             return Ok(r);
         }
+
+        [Authorize]
+        [HttpPost("{id}/pending-image")]
+        public async Task<IActionResult> UploadPendingImage(Guid id, IFormFile file, [FromServices] UserManager<IdentityUser> userMgr)
+        {
+            var r = await _db.Resources.FindAsync(id);
+            if (r == null) return NotFound();
+            if (!string.IsNullOrEmpty(r.Img256Url))
+                return BadRequest("This resource already has an accepted image.");
+
+            var count = await _db.PendingImages.CountAsync(p => p.ResourceId == id);
+            if (count >= 10) return BadRequest("Pending image limit reached (10).");
+
+            var pending = new PendingImage { ResourceId = id, UploadedByUserId = userMgr.GetUserId(User) };
+            _db.PendingImages.Add(pending);
+            await _db.SaveChangesAsync();
+
+            var (i256, i512, ph) = await _img.ProcessAndSavePendingAsync(file, pending.Id);
+            pending.Img256Url = i256; pending.Img512Url = i512; pending.ImagePhash = ph;
+            await _db.SaveChangesAsync();
+            return Ok(new { ok = true, id = pending.Id, img256 = i256, img512 = i512 });
+        }
+
 
         [Authorize(Roles = "Admin")]
         [HttpPost("bulk-import")]

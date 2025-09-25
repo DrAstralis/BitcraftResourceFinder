@@ -1,9 +1,12 @@
-
 using System.ComponentModel.DataAnnotations;
 
 namespace Bitcraft.ResourceFinder.Web.Models;
 
 public enum ResourceStatus { Unconfirmed = 0, Confirmed = 1 }
+public enum ReportReason { Incorrect = 0, ViolatesPolicy = 1 }
+public enum ReportTargetType { Resource = 0, AcceptedImage = 1 }
+public enum ReportStatus { Open = 0, Closed = 1 }
+
 
 public class TypeItem
 {
@@ -72,4 +75,41 @@ public class AuditLog
     public string? SubjectId { get; set; }
     public string? DiffJson { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class PendingImage
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ResourceId { get; set; }
+    public Resource? Resource { get; set; }
+
+    // store processed, webp thumbnails like accepted images
+    public string Img256Url { get; set; } = "";
+    public string Img512Url { get; set; } = "";
+    public string? ImagePhash { get; set; }
+
+    public string? UploadedByUserId { get; set; }   // IdentityUser Id (string GUID)
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class Report
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public ReportTargetType Target { get; set; } = ReportTargetType.Resource;
+    public ReportReason Reason { get; set; } = ReportReason.Incorrect;
+
+    public Guid ResourceId { get; set; }
+    public Resource? Resource { get; set; }
+
+    // If Target == AcceptedImage, this refers to the resource's current official image.
+    // We don't have a row for accepted image; it lives on Resource itself.
+    public string? Notes { get; set; }
+
+    public ReportStatus Status { get; set; } = ReportStatus.Open;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public string? CreatedByUserId { get; set; }
+    public DateTime? ResolvedAt { get; set; }
+    public string? ResolvedByUserId { get; set; }
 }
