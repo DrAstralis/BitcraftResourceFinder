@@ -78,32 +78,56 @@ public class ImageService
     IFormFile file, Guid pendingImageId)
     {
         if (file == null || file.Length == 0) throw new InvalidOperationException("No file.");
-        if (file.Length > 300 * 1024) throw new InvalidOperationException("Image too large (max 300 KB).");
+        if (file.Length > 500 * 1024) throw new InvalidOperationException("Image too large (max 500 KB).");
         var allowed = new[] { "image/jpeg", "image/png", "image/webp" };
         if (!allowed.Contains(file.ContentType.ToLower())) throw new InvalidOperationException("Unsupported image type.");
 
         using var img = await Image.LoadAsync(file.OpenReadStream());
 
-        var rootRel = _cfg["Image:RootPath"] ?? "wwwroot/images";
-        var root = Path.Combine(AppContext.BaseDirectory, rootRel, "pending");
-        Directory.CreateDirectory(root);
+        // Resolve the SAME base folder as ProcessAndSaveAsync, then add "pending"
+        var webRoot = _env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        var configured = _cfg["Image:RootPath"]; // accepts "images", "~/images", "/images", or "wwwroot/images"
+
+        string imagesFolder;
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            imagesFolder = Path.Combine(webRoot, "images");
+        }
+        else if (Path.IsPathRooted(configured))
+        {
+            imagesFolder = configured; // absolute override
+        }
+        else
+        {
+            var trimmed = configured.TrimStart('~', '/', '\\');
+            if (trimmed.StartsWith("wwwroot", StringComparison.OrdinalIgnoreCase))
+                trimmed = trimmed.Substring("wwwroot".Length).TrimStart('/', '\\');
+            imagesFolder = Path.Combine(webRoot, trimmed);
+        }
+
+        // Keep pending in a subfolder under the SAME images root
+        var pendingFolder = Path.Combine(imagesFolder, "pending");
+        Directory.CreateDirectory(pendingFolder);
 
         var baseName = pendingImageId.ToString("N");
-        var dest256 = Path.Combine(root, baseName + "-256.webp");
-        var dest512 = Path.Combine(root, baseName + "-512.webp");
+        var dest256 = Path.Combine(pendingFolder, baseName + "-256.webp");
+        var dest512 = Path.Combine(pendingFolder, baseName + "-512.webp");
 
         using (var clone = img.Clone(i => i.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(256, 256) })))
             await clone.SaveAsWebpAsync(dest256, new WebpEncoder { Quality = 80 });
         using (var clone = img.Clone(i => i.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(512, 512) })))
             await clone.SaveAsWebpAsync(dest512, new WebpEncoder { Quality = 80 });
 
-        var relBase = "/images/pending/" + baseName;
-        var img256Url = relBase + "-256.webp";
-        var img512Url = relBase + "-512.webp";
+        // App-relative URLs so PathBase is honored
+        var urlBase = "~/images/pending/" + baseName;
+        var img256Url = urlBase + "-256.webp";
+        var img512Url = urlBase + "-512.webp";
 
         var pHash = await ComputeAverageHashAsync(dest512);
         return (img256Url, img512Url, pHash);
     }
+
+
 
 
     public Task MoveToDeleteAsync(Guid resourceId)
@@ -160,6 +184,63 @@ public class ImageService
 
         File.Move(src, dest);
     }
+
+    // in ImageService.cs
+    public async Task<(string img256, string img512, string pHash)> PromotePendingAsync(Guid resourceId, Guid pendingImageId)
+    {
+        // Quarantine any existing accepted images for this resource
+        await MoveToDeleteAsync(resourceId);
+
+        // Resolve the SAME base images folder as ProcessAndSaveAsync
+        var webRoot = _env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        var configured = _cfg["Image:RootPath"];
+        string imagesFolder;
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            imagesFolder = Path.Combine(webRoot, "images");
+        }
+        else if (Path.IsPathRooted(configured))
+        {
+            imagesFolder = configured;
+        }
+        else
+        {
+            var trimmed = configured.TrimStart('~', '/', '\\');
+            if (trimmed.StartsWith("wwwroot", StringComparison.OrdinalIgnoreCase))
+                trimmed = trimmed.Substring("wwwroot".Length).TrimStart('/', '\\');
+            imagesFolder = Path.Combine(webRoot, trimmed);
+        }
+
+        var pendingFolder = Path.Combine(imagesFolder, "pending");
+        Directory.CreateDirectory(imagesFolder);
+
+        var rid = resourceId.ToString("N");
+        var pid = pendingImageId.ToString("N");
+
+        var src256 = Path.Combine(pendingFolder, pid + "-256.webp");
+        var src512 = Path.Combine(pendingFolder, pid + "-512.webp");
+        var dest256 = Path.Combine(imagesFolder, rid + "-256.webp");
+        var dest512 = Path.Combine(imagesFolder, rid + "-512.webp");
+
+        if (!File.Exists(src256) || !File.Exists(src512))
+            throw new FileNotFoundException("Pending image files not found.");
+
+        // If somehow present, clean up existing dests (MoveToDelete already did this, but be safe)
+        if (File.Exists(dest256)) File.Delete(dest256);
+        if (File.Exists(dest512)) File.Delete(dest512);
+
+        File.Move(src256, dest256);
+        File.Move(src512, dest512);
+
+        // Return app-relative URLs so views can Url.Content(...)
+        var urlBase = "~/images/" + rid;
+        var img256Url = urlBase + "-256.webp";
+        var img512Url = urlBase + "-512.webp";
+
+        var pHash = await ComputeAverageHashAsync(dest512);
+        return (img256Url, img512Url, pHash);
+    }
+
 
     private async Task<string> ComputeAverageHashAsync(string path)
     {

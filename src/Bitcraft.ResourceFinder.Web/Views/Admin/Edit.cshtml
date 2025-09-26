@@ -28,12 +28,14 @@
                         @rep.Notes
                     }
                     <form method="post" action="/admin/reports/@rep.Id/close" class="d-inline ms-2">
+                                               @Html.AntiForgeryToken()
                         <button class="btn btn-sm btn-outline-dark">Mark resolved</button>
                     </form>
                     @if (rep.Target == Bitcraft.ResourceFinder.Web.Models.ReportTargetType.AcceptedImage && !string.IsNullOrEmpty(Model.Img256Url))
                     {
                         <form method="post" action="/admin/resources/@Model.Id/remove-accepted-image" class="d-inline ms-2"
                               onsubmit="return confirm('Remove the accepted image?');">
+                            @Html.AntiForgeryToken()
                             <button class="btn btn-sm btn-outline-danger">Remove accepted image</button>
                         </form>
                     }
@@ -49,6 +51,7 @@
         <div class="d-flex align-items-center justify-content-between mb-2">
             <h5 class="m-0">Pending Images (@pending.Count)</h5>
             <form method="post" action="/admin/resources/@Model.Id/purge-pending" onsubmit="return confirm('Purge all pending images?');">
+                @Html.AntiForgeryToken()
                 <button class="btn btn-sm btn-outline-danger">Purge all</button>
             </form>
         </div>
@@ -56,9 +59,10 @@
             @foreach (var p in pending)
             {
                 <div class="col-auto text-center">
-                    <img src="@p.Img256Url" width="128" height="128" class="rounded border mb-2" />
+                    <img src="@Url.Content(p.Img256Url)" width="128" height="128" class="rounded border mb-2" />
                     <div>
                         <form method="post" action="/admin/resources/@Model.Id/accept-pending/@p.Id" class="d-inline">
+                            @Html.AntiForgeryToken()
                             <button class="btn btn-sm btn-primary">Accept</button>
                         </form>
                     </div>

@@ -267,14 +267,29 @@
                 <td>@r.Tier</td>
                 <td>@r.Type?.Name</td>
                 <td>@r.Biome?.Name</td>
+                <td>
+                    @{
+                        var hasImage = !string.IsNullOrWhiteSpace(r.Img256Url) || !string.IsNullOrWhiteSpace(r.Img512Url);
+
+                    }
+                    <span class="badge @(hasImage ? "bg-success" : "bg-secondary")">
+                        @(hasImage ? "Yes" : "No")
+
+                    </span>
+                
+            </td>
                 <td>@r.Status</td>
                 <td class="text-end">
-                    <form method="post" action="/admin/resources/@r.Id/status" class="d-inline">
+                    <form method="post" action="@Url.Content($"~/admin/resources/{r.Id}/status")" class="d-inline">
+                        @Html.AntiForgeryToken()
                         <input type="hidden" name="status" value="@(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "confirmed" : "unconfirmed")" />
+                        <input type="hidden" name="returnUrl" value="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)" />
                         <button class="btn btn-sm btn-success">@(r.Status == Bitcraft.ResourceFinder.Web.Models.ResourceStatus.Unconfirmed ? "Confirm" : "Unconfirm")</button>
                     </form>
-                    <a class="btn btn-sm btn-primary" href="/admin/resources/@r.Id/edit">Review</a>
-                    <form method="post" action="/admin/resources/@r.Id/delete" class="d-inline" onsubmit="return confirm('Delete this resource?');">
+                    <a class="btn btn-sm btn-primary" href="@Url.Action("Edit", "Admin", new { id = r.Id, returnUrl = Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString })">Review</a>
+                    <form method="post" action="@Url.Content($"~/admin/resources/{r.Id}/delete")" class="d-inline" onsubmit="return confirm('Delete this resource?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="returnUrl" value="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)" />
                         <button class="btn btn-sm btn-danger">Delete</button>
                     </form>
                 </td>

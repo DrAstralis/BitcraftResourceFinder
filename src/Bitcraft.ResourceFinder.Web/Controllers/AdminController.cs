@@ -1,8 +1,9 @@
+using Bitcraft.ResourceFinder.Web.Data;
+using Bitcraft.ResourceFinder.Web.Models;
+using Bitcraft.ResourceFinder.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Bitcraft.ResourceFinder.Web.Data;
-using Bitcraft.ResourceFinder.Web.Models;
 
 namespace Bitcraft.ResourceFinder.Web.Controllers;
 
@@ -10,27 +11,40 @@ namespace Bitcraft.ResourceFinder.Web.Controllers;
 public class AdminController : Controller
 {
     private readonly AppDbContext _db;
-    public AdminController(AppDbContext db) { _db = db; }
+    private readonly ImageService _img;
+    public AdminController(AppDbContext db, ImageService img) { _db = db; _img = img; }
 
-    public async Task<IActionResult> Index(string status = "unconfirmed", int page = 1)
+    public async Task<IActionResult> Index(string? q, int? tier, Guid? type, Guid? biome, string? status, int page = 1)
     {
         const int pageSize = 20;
 
-        // Base query + filters
-        var baseQuery = _db.Resources
+        // Base query + includes
+        var query = _db.Resources
             .Include(r => r.Type)
             .Include(r => r.Biome)
             .AsQueryable();
 
-        if (status.Equals("unconfirmed", StringComparison.OrdinalIgnoreCase))
-            baseQuery = baseQuery.Where(r => r.Status == ResourceStatus.Unconfirmed);
-        if (status.Equals("confirmed", StringComparison.OrdinalIgnoreCase))
-            baseQuery = baseQuery.Where(r => r.Status == ResourceStatus.Confirmed);
+        // Filters (same semantics as before)
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var cq = SeedData.Canonicalize(q);
+            query = query.Where(r => r.CanonicalName.Contains(cq) || r.Name.Contains(q));
+        }
+        if (tier.HasValue) query = query.Where(r => r.Tier == tier);
+        if (type.HasValue) query = query.Where(r => r.TypeId == type);
+        if (biome.HasValue) query = query.Where(r => r.BiomeId == biome);
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (status.Equals("confirmed", StringComparison.OrdinalIgnoreCase)) query = query.Where(r => r.Status == ResourceStatus.Confirmed);
+            if (status.Equals("unconfirmed", StringComparison.OrdinalIgnoreCase)) query = query.Where(r => r.Status == ResourceStatus.Unconfirmed);
+            // (If you later want "any", handle it here by skipping status filter when status == "any")
+        }
 
-        var total = await baseQuery.CountAsync();
+        // Total BEFORE paging
+        var total = await query.CountAsync();
 
-        // Order by counts using SQL-translatable subqueries
-        var orderedQuery = baseQuery
+        // Gain #1: priority ordering using SQL-translatable subqueries
+        var orderedQuery = query
             .OrderByDescending(r => _db.Reports.Count(rep => rep.ResourceId == r.Id && rep.Status == ReportStatus.Open))
             .ThenByDescending(r => _db.PendingImages.Count(p => p.ResourceId == r.Id))
             .ThenByDescending(r => r.CreatedAt);
@@ -41,7 +55,7 @@ public class AdminController : Controller
             .Take(pageSize)
             .ToListAsync();
 
-        // Build badge dictionaries for the rows on this page
+        // Gain #2: badge dictionaries for just this page
         var pageIds = items.Select(r => r.Id).ToList();
 
         var openReports = await _db.Reports
@@ -56,10 +70,19 @@ public class AdminController : Controller
             .Select(g => new { ResourceId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ResourceId, x => x.Count);
 
+        // Original ViewBags (filters UI + echoes)
+        ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
+        ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
         ViewBag.Total = total;
         ViewBag.Page = page;
         ViewBag.PageSize = pageSize;
+        ViewBag.Query = q;
+        ViewBag.Tier = tier;
+        ViewBag.Type = type;
+        ViewBag.Biome = biome;
         ViewBag.Status = status;
+
+        // New badge ViewBags
         ViewBag.OpenReports = openReports;
         ViewBag.PendingCounts = pendingCounts;
 
@@ -68,56 +91,152 @@ public class AdminController : Controller
 
 
     [HttpPost("/admin/resources/{id}/status")]
-    public async Task<IActionResult> SetStatus(Guid id, string status)
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetStatus(Guid id, string status, string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
-        r.Status = status.Equals("confirmed", StringComparison.OrdinalIgnoreCase) ? ResourceStatus.Confirmed : ResourceStatus.Unconfirmed;
+
+        r.Status = status.Equals("confirmed", StringComparison.OrdinalIgnoreCase)
+            ? ResourceStatus.Confirmed
+            : ResourceStatus.Unconfirmed;
+
         r.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return LocalRedirect(returnUrl);
+
         return RedirectToAction("Index");
     }
 
     [HttpGet("/admin/resources/{id}/edit")]
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(Guid id, string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
-        ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
-        ViewBag.Biomes = await _db.Biomes.OrderBy(t => t.Name).ToListAsync();
 
-        var pending = await _db.PendingImages.Where(p => p.ResourceId == id).OrderByDescending(p => p.CreatedAt).ToListAsync();
-        var reports = await _db.Reports.Where(rep => rep.ResourceId == id && rep.Status == ReportStatus.Open).OrderBy(rep => rep.CreatedAt).ToListAsync();
+        ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
+        ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
+
+        // Keep the new badges on the page
+        var pending = await _db.PendingImages
+            .Where(p => p.ResourceId == id)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+        var reports = await _db.Reports
+            .Where(rep => rep.ResourceId == id && rep.Status == ReportStatus.Open)
+            .OrderBy(rep => rep.CreatedAt)
+            .ToListAsync();
         ViewBag.Pending = pending;
         ViewBag.Reports = reports;
+
+        // Restore returnUrl so the form + Cancel can round-trip
+        ViewBag.ReturnUrl = returnUrl;
+
         return View(r);
     }
 
+
     [HttpPost("/admin/resources/{id}/edit")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditPost(Guid id, int tier, Guid typeId, Guid biomeId, string name)
+    public async Task<IActionResult> EditPost(
+        Guid id,
+        int tier,
+        Guid typeId,
+        Guid biomeId,
+        string name,
+        bool removeImage = false,
+        IFormFile? file = null,
+        string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
-        r.Tier = tier; r.TypeId = typeId; r.BiomeId = biomeId; r.Name = name.Trim(); r.CanonicalName = Models.SeedData.Canonicalize(name);
+
+        // Apply posted fields so the view re-renders with user input on error
+        r.Tier = tier;
+        r.TypeId = typeId;
+        r.BiomeId = biomeId;
+        r.Name = (name ?? string.Empty).Trim();
+        r.CanonicalName = Models.SeedData.Canonicalize(r.Name);
+
+        if (removeImage)
+        {
+            await _img.MoveToDeleteAsync(id);
+            r.Img256Url = null;
+            r.Img512Url = null;
+            r.ImagePhash = null;
+        }
+
+        if (file is { Length: > 0 })
+        {
+            try
+            {
+                var (img256, img512, phash) = await _img.ProcessAndSaveAsync(file, id);
+                r.Img256Url = img256;
+                r.Img512Url = img512;
+                r.ImagePhash = phash;
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+            }
+        }
+
+        if (!ModelState.IsValid)
+        {
+            // Original filter dropdowns
+            ViewBag.Types = await _db.Types.OrderBy(t => t.Name).ToListAsync();
+            ViewBag.Biomes = await _db.Biomes.OrderBy(b => b.Name).ToListAsync();
+
+            // NEW (from refactor): keep page badges visible on error re-render
+            ViewBag.Pending = await _db.PendingImages
+                .Where(p => p.ResourceId == id)
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
+            ViewBag.Reports = await _db.Reports
+                .Where(rep => rep.ResourceId == id && rep.Status == ReportStatus.Open)
+                .OrderBy(rep => rep.CreatedAt)
+                .ToListAsync();
+
+            ViewBag.ReturnUrl = returnUrl;
+            return View("Edit", r);
+        }
+
         r.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+        TempData["AlertSuccess"] = "Resource updated.";
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return LocalRedirect(returnUrl);
+
         return RedirectToAction("Index");
     }
 
+
     [HttpPost("/admin/resources/{id}/delete")]
-    public async Task<IActionResult> Delete(Guid id)
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id, string? returnUrl = null)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
+
+        try { await _img.MoveToDeleteAsync(id); } catch { /* swallow */ }
+
         _db.Resources.Remove(r);
         await _db.SaveChangesAsync();
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return LocalRedirect(returnUrl);
+
         return RedirectToAction("Index");
     }
+
 
     // --- NEW: Accept a pending image as the official image
     [HttpPost("/admin/resources/{id}/accept-pending/{pid}")]
-    public async Task<IActionResult> AcceptPending(Guid id, Guid pid)
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AcceptPending(Guid id, Guid pid, [FromServices] ImageService img)
     {
         var r = await _db.Resources.FindAsync(id);
         if (r == null) return NotFound();
@@ -125,19 +244,32 @@ public class AdminController : Controller
         var p = await _db.PendingImages.FirstOrDefaultAsync(x => x.Id == pid && x.ResourceId == id);
         if (p == null) return NotFound();
 
-        // promote to accepted
-        r.Img256Url = p.Img256Url;
-        r.Img512Url = p.Img512Url;
-        r.ImagePhash = p.ImagePhash;
-        r.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        try
+        {
+            var (img256, img512, pHash) = await img.PromotePendingAsync(id, pid);
+            r.Img256Url = img256;
+            r.Img512Url = img512;
+            r.ImagePhash = pHash;
+            r.UpdatedAt = DateTime.UtcNow;
 
-        // purge all pending after acceptance (per your instruction to add a purge button; we do both options)
+            // Remove the accepted pending record
+            _db.PendingImages.Remove(p);
+
+            await _db.SaveChangesAsync();
+            TempData["Success"] = "Pending image accepted.";
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = ex.Message;
+        }
+
         return RedirectToAction("Edit", new { id });
     }
 
+
     // --- NEW: Purge all pending images for a resource
     [HttpPost("/admin/resources/{id}/purge-pending")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> PurgePending(Guid id)
     {
         var items = await _db.PendingImages.Where(p => p.ResourceId == id).ToListAsync();
@@ -151,6 +283,7 @@ public class AdminController : Controller
 
     // --- NEW: Close a report
     [HttpPost("/admin/reports/{rid}/close")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloseReport(Guid rid)
     {
         var rep = await _db.Reports.FindAsync(rid);
@@ -164,6 +297,7 @@ public class AdminController : Controller
 
     // --- NEW: Remove accepted image (optional admin action on edit page)
     [HttpPost("/admin/resources/{id}/remove-accepted-image")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> RemoveAccepted(Guid id)
     {
         var r = await _db.Resources.FindAsync(id);
