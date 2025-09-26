@@ -3,14 +3,26 @@
     ViewData["Title"] = "Add Image";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
-<h3>Add image for “@Model.Name”</h3>
-<div class="card p-4">
-    <form method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-            <label class="form-label">Image (≤ 300 KB; jpg/png/webp)</label>
-            <input class="form-control" type="file" name="image" accept="image/*" required />
-        </div>
-        <button class="btn btn-primary">Submit</button>
-        <a class="btn btn-secondary" href="/resources">Cancel</a>
-    </form>
-</div>
+
+<h2 class="mb-3">Add Image for “@Model.Name”</h2>
+
+<form method="post" enctype="multipart/form-data" action="/resources/@Model.Id/add-image">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-3">
+        <!-- The cropper auto-finds its host form; fieldName= image -->
+        <div class="ic512-widget" data-field="image"></div>
+        <small class="text-muted d-block mt-2">Upload, paste, or URL via the cropper. Exports 512×512 WebP (client-side capped at 500 KB).</small>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Submit</button>
+    <a href="@Url.Action("Index", "Resources")" class="btn btn-outline-secondary ms-2">Cancel</a>
+</form>
+
+@section Scripts {
+    <script src="~/js/image-crop-512.js"></script>
+    <script>
+        // Initialize cropper on this page; it will intercept submit and post WebP as the "image" field.
+        window.initImageCrop512('.ic512-widget');
+    </script>
+}

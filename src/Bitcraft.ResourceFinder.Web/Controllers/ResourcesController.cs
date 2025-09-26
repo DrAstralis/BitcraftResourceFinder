@@ -173,20 +173,48 @@ public class ResourcesController : Controller
         if (!string.IsNullOrEmpty(r.Img256Url)) return BadRequest("This resource already has an accepted image.");
         if (image == null) return BadRequest("No image.");
 
-        // Enforce max 10 pending images
+        // Admins: accept immediately (restore legacy behavior)
+        if (User.IsInRole("Admin"))
+        {
+            try
+            {
+                var (img256, img512, pHash) = await _img.ProcessAndSaveAsync(image, r.Id);
+                r.Img256Url = img256;
+                r.Img512Url = img512;
+                r.ImagePhash = pHash;
+                r.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                TempData["Success"] = "Image saved.";
+                return RedirectToAction("Index");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        // Non-admins: queue as pending (max 10)
         var pendingCount = await _db.PendingImages.CountAsync(p => p.ResourceId == id);
         if (pendingCount >= 10) return BadRequest("Pending image limit reached (10).");
 
-        var pending = new PendingImage { ResourceId = id, UploadedByUserId = _userMgr.GetUserId(User) };
+        var pending = new PendingImage
+        {
+            ResourceId = id,
+            UploadedByUserId = _userMgr.GetUserId(User),
+            CreatedAt = DateTime.UtcNow
+        };
         _db.PendingImages.Add(pending);
-        await _db.SaveChangesAsync(); // to get Id
+        await _db.SaveChangesAsync(); // get Id
 
         try
         {
             var (i256, i512, ph) = await _img.ProcessAndSavePendingAsync(image, pending.Id);
-            pending.Img256Url = i256; pending.Img512Url = i512; pending.ImagePhash = ph;
+            pending.Img256Url = i256;
+            pending.Img512Url = i512;
+            pending.ImagePhash = ph;
             await _db.SaveChangesAsync();
             TempData["Success"] = "Thanks! Your image is awaiting admin review.";
+            return RedirectToAction("Index");
         }
         catch (Exception ex)
         {
@@ -194,9 +222,9 @@ public class ResourcesController : Controller
             await _db.SaveChangesAsync();
             return BadRequest(ex.Message);
         }
-
-        return RedirectToAction("Index");
     }
+
+
 
     [Authorize]
     [HttpGet("/resources/{id}/report")]
