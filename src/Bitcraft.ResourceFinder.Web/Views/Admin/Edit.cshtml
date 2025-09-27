@@ -27,13 +27,13 @@
                     {
                         @rep.Notes
                     }
-                    <form method="post" action="/admin/reports/@rep.Id/close" class="d-inline ms-2">
+                    <form method="post" action="@Url.Content($"~/admin/reports/{rep.Id}/close")" class="d-inline ms-2">
                                                @Html.AntiForgeryToken()
                         <button class="btn btn-sm btn-outline-dark">Mark resolved</button>
                     </form>
                     @if (rep.Target == Bitcraft.ResourceFinder.Web.Models.ReportTargetType.AcceptedImage && !string.IsNullOrEmpty(Model.Img256Url))
                     {
-                        <form method="post" action="/admin/resources/@Model.Id/remove-accepted-image" class="d-inline ms-2"
+                        <form method="post" action="@Url.Content($"~/admin/resources/{Model.Id}/remove-accepted-image")" class="d-inline ms-2"
                               onsubmit="return confirm('Remove the accepted image?');">
                             @Html.AntiForgeryToken()
                             <button class="btn btn-sm btn-outline-danger">Remove accepted image</button>
@@ -50,7 +50,7 @@
     <div class="card p-3 mb-3 border-warning">
         <div class="d-flex align-items-center justify-content-between mb-2">
             <h5 class="m-0">Pending Images (@pending.Count)</h5>
-            <form method="post" action="/admin/resources/@Model.Id/purge-pending" onsubmit="return confirm('Purge all pending images?');">
+            <form method="post" action="@Url.Content($"~/admin/resources/{Model.Id}/purge-pending")" onsubmit="return confirm('Purge all pending images?');">
                 @Html.AntiForgeryToken()
                 <button class="btn btn-sm btn-outline-danger">Purge all</button>
             </form>
@@ -61,7 +61,7 @@
                 <div class="col-auto text-center">
                     <img src="@Url.Content(p.Img256Url)" width="128" height="128" class="rounded border mb-2" />
                     <div>
-                        <form method="post" action="/admin/resources/@Model.Id/accept-pending/@p.Id" class="d-inline">
+                        <form method="post" action="@Url.Content($"~/admin/resources/{Model.Id}/accept-pending/{p.Id}")" class="d-inline">
                             @Html.AntiForgeryToken()
                             <button class="btn btn-sm btn-primary">Accept</button>
                         </form>
@@ -82,7 +82,6 @@
             @Html.ValidationSummary(excludePropertyErrors: true)
         </div>
     }
-
 
     <div class="row g-3">
         <div class="col-md-2">
@@ -151,9 +150,6 @@
             <!-- Image cropper (512×512 PNG) -->
             <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
             <div class="image-crop-512" data-field="file" data-proxy-url="@Url.Content("~/image-proxy?url=")"></div>
-
-
-
         </div>
 
         <div class="col-md-12">

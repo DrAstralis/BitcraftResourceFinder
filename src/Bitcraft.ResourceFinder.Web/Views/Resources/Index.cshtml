@@ -50,7 +50,7 @@
     </div>
     <div class="col-md-12">
       <button class="btn btn-primary">Apply</button>
-      <a class="btn btn-secondary" href="/resources">Reset</a>
+            <a class="btn btn-secondary" href="@Url.Content("~/resources")">Reset</a>
     </div>
   </form>
 </div>
@@ -81,12 +81,12 @@
 </div>
                 <div class="card-body position-relative">
                     <div class="position-absolute" style="top:0.75rem; right:0.75rem;">
-                        <a class="btn btn-sm btn-outline-danger me-1" href="/resources/@r.Id/report">Report</a>
+                        <a class="btn btn-sm btn-outline-danger me-1" href="@Url.Content($"~/resources/{r.Id}/report")">Report</a>
                         @if (User?.Identity?.IsAuthenticated ?? false)
                         {
                             if (string.IsNullOrEmpty(r.Img256Url))
                             {
-                                <a class="btn btn-sm btn-outline-primary" href="/resources/@r.Id/add-image">Add image</a>
+                                <a class="btn btn-sm btn-outline-primary" href="@Url.Content($"~/resources/{r.Id}/add-image")">Add image</a>
                             }
                         }
                     </div>

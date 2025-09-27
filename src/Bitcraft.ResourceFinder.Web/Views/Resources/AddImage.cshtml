@@ -6,7 +6,7 @@
 
 <h2 class="mb-3">Add Image for “@Model.Name”</h2>
 
-<form method="post" enctype="multipart/form-data" action="/resources/@Model.Id/add-image">
+<form method="post" enctype="multipart/form-data" action="@Url.Content($"~/resources/{Model.Id}/add-image")">
     @Html.AntiForgeryToken()
 
     <div class="mb-3">

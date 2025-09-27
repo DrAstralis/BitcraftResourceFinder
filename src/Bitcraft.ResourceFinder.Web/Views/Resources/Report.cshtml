@@ -7,6 +7,7 @@
 <h3>Report “@res?.Name”</h3>
 <div class="card p-4">
   <form method="post">
+        @Html.AntiForgeryToken()
     <div class="mb-3">
       <label class="form-label">What are you reporting?</label>
             <select class="form-select" name="Target">
@@ -30,6 +31,6 @@
       <textarea class="form-control" name="Notes" rows="3"></textarea>
     </div>
     <button class="btn btn-danger">Submit report</button>
-    <a class="btn btn-secondary" href="/resources">Cancel</a>
+        <a class="btn btn-secondary" href="@Url.Content("~/resources")">Cancel</a>
   </form>
 </div>
