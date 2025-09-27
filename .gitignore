@@ -17,3 +17,4 @@ dist/
 # Rider
 .idea/
 /publish
+/src/Bitcraft.ResourceFinder.Web/publish
